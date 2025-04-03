@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from 'prop-types';
-import { Card, Row, Col, Container, Form, Button, Pagination, Badge, Alert } from "react-bootstrap";
+import { Card, Row, Col, Container, Form, Button, Pagination, Badge, Alert, Spinner } from "react-bootstrap";
 import { Link, router } from "@inertiajs/react";
 import { debounce } from "lodash";
 import BuyerLayout from "@/Layouts/BuyerLayout";
-import { FiHeart, FiEyeOff, FiClock } from "react-icons/fi";
+import { FiHeart, FiEyeOff, FiClock, FiSearch, FiFilter } from "react-icons/fi";
 import axios from "axios";
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 
 const categoryFallbackImages = {
   electronics: '/storage/assets/fallback/electronics.jpg',
@@ -25,18 +25,40 @@ const getFallbackImage = (category) => {
 };
 
 const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loading }) => {
-    const timeLeft = new Date(asset.auction_end_time) - new Date();
+    const [timeLeft, setTimeLeft] = useState(new Date(asset.auction_end_time) - new Date());
+    const [currentPrice, setCurrentPrice] = useState(asset.current_price || asset.base_price);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const newTimeLeft = new Date(asset.auction_end_time) - new Date();
+            setTimeLeft(newTimeLeft);
+            
+            if (newTimeLeft <= 0) {
+                clearInterval(timer);
+            }
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [asset.auction_end_time]);
+
+    useEffect(() => {
+        // Listen for real-time bid updates
+        window.Echo.channel('bids')
+            .listen('bid.placed', (e) => {
+                if (e.bid.asset_id === asset.id) {
+                    setCurrentPrice(e.bid.amount);
+                    toast.success(`New bid placed: ${formatPrice(e.bid.amount)}`);
+                }
+            });
+
+        return () => {
+            window.Echo.leave('bids');
+        };
+    }, [asset.id]);
+
     const hoursLeft = Math.max(Math.floor(timeLeft / (1000 * 60 * 60)), 0);
+    const minutesLeft = Math.max(Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60)), 0);
 
-    // Debug logging for user information
-    console.log('Asset:', {
-        id: asset.id,
-        name: asset.name,
-        user: asset.user,
-        user_id: asset.user_id
-    });
-
-    // Format price to handle both string and number values
     const formatPrice = (price) => {
         if (typeof price === 'string') {
             return `Ksh ${parseFloat(price).toLocaleString()}`;
@@ -44,10 +66,8 @@ const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loadi
         return `Ksh ${price.toLocaleString()}`;
     };
 
-    // Safely get the first image from photos array or fallback
     const getFirstImage = () => {
         try {
-            // First try to get from photos array
             if (asset.photos) {
                 if (Array.isArray(asset.photos)) {
                     return `/storage/${asset.photos[0]}`;
@@ -59,20 +79,13 @@ const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loadi
                 }
             }
 
-            // Then try image_url
             if (asset.image_url) {
-                // If it's already a full URL, return it
                 if (asset.image_url.startsWith('http')) {
                     return asset.image_url;
-                }
-                // If it's a storage path, add the storage prefix
-                if (asset.image_url.startsWith('assets/')) {
-                    return `/storage/${asset.image_url}`;
                 }
                 return `/storage/${asset.image_url}`;
             }
 
-            // Finally, use category fallback
             return getFallbackImage(asset.category);
         } catch (e) {
             console.error('Error getting image:', e);
@@ -80,31 +93,8 @@ const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loadi
         }
     };
 
-    const handleImageError = (e, assetName) => {
-        console.log('Image load error for:', assetName);
-        // Use a simple colored div with text as fallback instead of trying to load external files
-        const canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 600;
-        const ctx = canvas.getContext('2d');
-        
-        // Fill with gray background
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Add border
-        ctx.strokeStyle = '#cccccc';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
-        
-        // Add text
-        ctx.fillStyle = '#333333';
-        ctx.font = '24px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(assetName, canvas.width / 2, canvas.height / 2);
-        
-        // Use the canvas as image source
-        e.target.src = canvas.toDataURL('image/png');
+    const handleImageError = (e) => {
+        e.target.src = getFallbackImage(asset.category);
     };
 
     const assetImage = getFirstImage();
@@ -121,7 +111,7 @@ const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loadi
                     alt={asset.name || "Asset Image"}
                     className="rounded-top"
                     style={{ height: "200px", objectFit: "cover" }}
-                    onError={(e) => handleImageError(e, asset.name)}
+                    onError={handleImageError}
                 />
 
                 <Card.Body className="d-flex flex-column">
@@ -135,7 +125,7 @@ const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loadi
                             disabled={loading}
                         >
                             {loading ? (
-                                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <Spinner animation="border" size="sm" />
                             ) : isWatching ? (
                                 <FiEyeOff />
                             ) : (
@@ -145,16 +135,12 @@ const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loadi
                     </div>
                     
                     <Card.Text className={`mb-3 ${darkMode ? "text-light" : "text-muted"}`}>
-                        {asset.current_price ? (
-                            <>Current Price: <strong>{formatPrice(asset.current_price)}</strong></>
-                        ) : (
-                            <>Starting Price: <strong>{formatPrice(asset.base_price)}</strong></>
-                        )}
+                        Current Price: <strong>{formatPrice(currentPrice)}</strong>
                     </Card.Text>
 
                     <div className="mt-auto">
-                        <Badge bg="info" className="me-2">
-                            <FiClock /> {hoursLeft}h left
+                        <Badge bg={timeLeft <= 0 ? "danger" : "info"} className="me-2">
+                            <FiClock /> {timeLeft <= 0 ? "Ended" : `${hoursLeft}h ${minutesLeft}m left`}
                         </Badge>
                         <Badge bg="secondary">
                             {asset.bid_count} bids
@@ -206,219 +192,210 @@ AssetCard.propTypes = {
 };
 
 const BrowseAssets = ({ assets, categories = [], darkMode = false, auth = {} }) => {
-    const [searchTerm, setSearchTerm] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("");
-    const [minPrice, setMinPrice] = useState("");
-    const [maxPrice, setMaxPrice] = useState("");
-    const [filteredAssets, setFilteredAssets] = useState(assets.data);
-    const [successMessage, setSuccessMessage] = useState(null);
-    const [watchlistStatus, setWatchlistStatus] = useState({});
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [priceRange, setPriceRange] = useState({ min: '', max: '' });
+    const [sortBy, setSortBy] = useState('newest');
+    const [loading, setLoading] = useState(false);
+    const [watchlist, setWatchlist] = useState(new Set());
 
     useEffect(() => {
-        setFilteredAssets(assets.data);
-        // Initialize watchlist status
-        const initialStatus = {};
-        assets.data.forEach(asset => {
-            initialStatus[asset.id] = {
-                isWatching: asset.is_watched,
-                loading: false
-            };
-        });
-        setWatchlistStatus(initialStatus);
-    }, [assets]);
+        // Load watchlist from localStorage
+        const savedWatchlist = localStorage.getItem('watchlist');
+        if (savedWatchlist) {
+            setWatchlist(new Set(JSON.parse(savedWatchlist)));
+        }
+    }, []);
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        router.get(route("buyer.assets.index"), {
+    const updateFilters = (newParams = {}) => {
+        const params = {
             name: searchTerm,
             category: selectedCategory,
-            min_price: minPrice,
-            max_price: maxPrice,
-        }, { preserveScroll: true, preserveState: true });
+            min_price: priceRange.min,
+            max_price: priceRange.max,
+            sort: sortBy,
+            ...newParams
+        };
+
+        // Remove empty values
+        Object.keys(params).forEach(key => {
+            if (!params[key]) delete params[key];
+        });
+
+        router.get(route('buyer.assets.index'), params, {
+            preserveState: true,
+            preserveScroll: true
+        });
     };
 
-    useEffect(() => {
-        const debouncedSearch = debounce(() => {
-            router.get(route("buyer.assets.index"), {
-                name: searchTerm,
-                category: selectedCategory,
-                min_price: minPrice,
-                max_price: maxPrice,
-            }, { preserveScroll: true, preserveState: true });
-        }, 500);
+    const handleSearch = debounce((e) => {
+        setSearchTerm(e.target.value);
+        updateFilters({ name: e.target.value });
+    }, 300);
 
-        debouncedSearch();
+    const handleCategoryChange = (e) => {
+        setSelectedCategory(e.target.value);
+        updateFilters({ category: e.target.value });
+    };
 
-        return () => debouncedSearch.cancel();
-    }, [selectedCategory, minPrice, maxPrice]);
+    const handlePriceRangeChange = (e) => {
+        const { name, value } = e.target;
+        setPriceRange(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handlePriceRangeSubmit = (e) => {
+        e.preventDefault();
+        updateFilters();
+    };
+
+    const handleSortChange = (e) => {
+        setSortBy(e.target.value);
+        updateFilters({ sort: e.target.value });
+    };
+
+    const handlePagination = (url) => {
+        if (!url) return;
+        
+        // Extract query parameters from the URL
+        const urlObj = new URL(url);
+        const params = {};
+        urlObj.searchParams.forEach((value, key) => {
+            params[key] = value;
+        });
+        
+        updateFilters(params);
+    };
 
     const toggleWatchlist = async (assetId) => {
-        setWatchlistStatus(prev => ({
-            ...prev,
-            [assetId]: {
-                ...prev[assetId],
-                loading: true
-            }
-        }));
-
+        setLoading(true);
         try {
-            const response = await axios.post(`/buyer/watchlist/${assetId}`);
-            setWatchlistStatus(prev => ({
-                ...prev,
-                [assetId]: {
-                    isWatching: response.data.watching,
-                    loading: false
-                }
-            }));
-            setSuccessMessage(response.data.message);
-            setTimeout(() => setSuccessMessage(null), 3000);
+            const response = await axios.post(route('watchlist.toggle', assetId));
+            const newWatchlist = new Set(watchlist);
+            if (response.data.isWatching) {
+                newWatchlist.add(assetId);
+            } else {
+                newWatchlist.delete(assetId);
+            }
+            setWatchlist(newWatchlist);
+            localStorage.setItem('watchlist', JSON.stringify([...newWatchlist]));
+            toast.success(response.data.isWatching ? 'Added to watchlist' : 'Removed from watchlist');
         } catch (error) {
-            console.error('Error toggling watchlist:', error);
-            setWatchlistStatus(prev => ({
-                ...prev,
-                [assetId]: {
-                    ...prev[assetId],
-                    loading: false
-                }
-            }));
+            toast.error('Failed to update watchlist');
+            console.error('Watchlist error:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <BuyerLayout>
+        <BuyerLayout darkMode={darkMode}>
             <Toaster position="top-right" />
-            <Container className="mt-3">
-                {successMessage && (
-                    <Alert variant="success" onClose={() => setSuccessMessage(null)} dismissible>
-                        {successMessage}
+            <Container className="py-4">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h2 className="mb-0">Browse Assets</h2>
+                    <div className="d-flex gap-2">
+                        <Form.Select 
+                            value={sortBy} 
+                            onChange={handleSortChange}
+                            className="w-auto"
+                        >
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="price_asc">Price: Low to High</option>
+                            <option value="price_desc">Price: High to Low</option>
+                            <option value="ending_soon">Ending Soon</option>
+                        </Form.Select>
+                    </div>
+                </div>
+
+                <Row className="mb-4">
+                    <Col md={4}>
+                        <Form.Group>
+                            <Form.Control
+                                type="text"
+                                placeholder="Search assets..."
+                                onChange={handleSearch}
+                                className="rounded-pill"
+                            />
+                        </Form.Group>
+                    </Col>
+                    <Col md={3}>
+                        <Form.Select
+                            value={selectedCategory}
+                            onChange={handleCategoryChange}
+                            className="rounded-pill"
+                        >
+                            <option value="">All Categories</option>
+                            {categories.map(category => (
+                                <option key={category} value={category}>
+                                    {category}
+                                </option>
+                            ))}
+                        </Form.Select>
+                    </Col>
+                    <Col md={5}>
+                        <Form onSubmit={handlePriceRangeSubmit} className="d-flex gap-2">
+                            <Form.Control
+                                type="number"
+                                name="min"
+                                placeholder="Min Price"
+                                value={priceRange.min}
+                                onChange={handlePriceRangeChange}
+                                className="rounded-pill"
+                            />
+                            <Form.Control
+                                type="number"
+                                name="max"
+                                placeholder="Max Price"
+                                value={priceRange.max}
+                                onChange={handlePriceRangeChange}
+                                className="rounded-pill"
+                            />
+                            <Button type="submit" variant="primary" className="rounded-pill">
+                                <FiFilter /> Filter
+                            </Button>
+                        </Form>
+                    </Col>
+                </Row>
+
+                <Row>
+                    {assets.data.map(asset => (
+                        <AssetCard
+                            key={asset.id}
+                            asset={asset}
+                            darkMode={darkMode}
+                            toggleWatchlist={toggleWatchlist}
+                            isWatching={watchlist.has(asset.id)}
+                            loading={loading}
+                        />
+                    ))}
+                </Row>
+
+                {assets.data.length === 0 && (
+                    <Alert variant="info" className="text-center">
+                        No assets found matching your criteria.
                     </Alert>
                 )}
 
-                <h4 className="text-center mb-3">Available Assets</h4>
-
-                {/* Search & Filter Section */}
-                <Form onSubmit={handleSearch} className="mb-4">
-                    <Row className="g-2">
-                        <Col md={3}>
-                            <Form.Control
-                                type="text"
-                                placeholder="Search by name..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </Col>
-                        <Col md={3}>
-                            <Form.Select
-                                value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
+                <div className="d-flex justify-content-center mt-4">
+                    <Pagination>
+                        {assets.links.map((link, index) => (
+                            <Pagination.Item
+                                key={index}
+                                active={link.active}
+                                disabled={!link.url}
+                                onClick={() => handlePagination(link.url)}
                             >
-                                <option value="">All Categories</option>
-                                {Array.isArray(categories) && categories.map((category) => (
-                                    <option key={category} value={category}>
-                                        {category}
-                                    </option>
-                                ))}
-                            </Form.Select>
-                        </Col>
-                        <Col md={2}>
-                            <Form.Control
-                                type="number"
-                                placeholder="Min Price"
-                                value={minPrice}
-                                onChange={(e) => setMinPrice(e.target.value)}
-                                min="0"
-                            />
-                        </Col>
-                        <Col md={2}>
-                            <Form.Control
-                                type="number"
-                                placeholder="Max Price"
-                                value={maxPrice}
-                                onChange={(e) => setMaxPrice(e.target.value)}
-                                min={minPrice || "0"}
-                            />
-                        </Col>
-                        <Col md={2}>
-                            <Button 
-                                type="submit" 
-                                variant={darkMode ? "light" : "dark"} 
-                                className="w-100"
-                            >
-                                Search
-                            </Button>
-                        </Col>
-                    </Row>
-                </Form>
-
-                {/* Asset List */}
-                {filteredAssets.length === 0 ? (
-                    <Card className={`text-center ${darkMode ? "bg-dark text-light" : "bg-light"}`}>
-                        <Card.Body>
-                            <h5>No assets found</h5>
-                            <p className="text-muted">
-                                {searchTerm || selectedCategory || minPrice || maxPrice ? (
-                                    "Try adjusting your search filters"
-                                ) : (
-                                    "Check back later for new listings"
-                                )}
-                            </p>
-                            {(searchTerm || selectedCategory || minPrice || maxPrice) && (
-                                <Button 
-                                    variant={darkMode ? "light" : "dark"}
-                                    onClick={() => {
-                                        setSearchTerm("");
-                                        setSelectedCategory("");
-                                        setMinPrice("");
-                                        setMaxPrice("");
-                                    }}
-                                >
-                                    Clear Filters
-                                </Button>
-                            )}
-                        </Card.Body>
-                    </Card>
-                ) : (
-                    <Row>
-                        {filteredAssets.map((asset) => (
-                            <AssetCard 
-                                key={asset.id} 
-                                asset={asset} 
-                                darkMode={darkMode}
-                                toggleWatchlist={toggleWatchlist}
-                                isWatching={watchlistStatus[asset.id]?.isWatching || false}
-                                loading={watchlistStatus[asset.id]?.loading || false}
-                            />
+                                {link.label === '&laquo; Previous' ? 'Previous' : 
+                                 link.label === 'Next &raquo;' ? 'Next' : 
+                                 link.label}
+                            </Pagination.Item>
                         ))}
-                    </Row>
-                )}
-
-                {/* Pagination */}
-                {assets.total > assets.per_page && (
-                    <div className="d-flex justify-content-center mt-4">
-                        <Pagination>
-                            {assets.links.map((link, index) => (
-                                <Pagination.Item
-                                    key={index}
-                                    active={link.active}
-                                    disabled={!link.url}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        if (link.url) {
-                                            router.get(link.url, {
-                                                name: searchTerm,
-                                                category: selectedCategory,
-                                                min_price: minPrice,
-                                                max_price: maxPrice,
-                                            }, { preserveScroll: true, preserveState: true });
-                                        }
-                                    }}
-                                >
-                                    {link.label.replace(/&[^;]+;/g, "")}
-                                </Pagination.Item>
-                            ))}
-                        </Pagination>
-                    </div>
-                )}
+                    </Pagination>
+                </div>
             </Container>
         </BuyerLayout>
     );
@@ -426,30 +403,8 @@ const BrowseAssets = ({ assets, categories = [], darkMode = false, auth = {} }) 
 
 BrowseAssets.propTypes = {
     assets: PropTypes.shape({
-        data: PropTypes.arrayOf(PropTypes.shape({
-            id: PropTypes.number.isRequired,
-            name: PropTypes.string.isRequired,
-            description: PropTypes.string,
-            photos: PropTypes.oneOfType([PropTypes.string, PropTypes.array]),
-            image_url: PropTypes.string,
-            current_price: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-            base_price: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
-            auction_end_time: PropTypes.string.isRequired,
-            bid_count: PropTypes.number,
-            category: PropTypes.string,
-            user: PropTypes.shape({
-                id: PropTypes.number.isRequired,
-                name: PropTypes.string.isRequired
-            }),
-            is_watched: PropTypes.bool
-        })).isRequired,
-        total: PropTypes.number.isRequired,
-        per_page: PropTypes.number.isRequired,
-        links: PropTypes.arrayOf(PropTypes.shape({
-            url: PropTypes.string,
-            label: PropTypes.string.isRequired,
-            active: PropTypes.bool.isRequired
-        })).isRequired
+        data: PropTypes.array.isRequired,
+        links: PropTypes.array.isRequired
     }).isRequired,
     categories: PropTypes.arrayOf(PropTypes.string),
     darkMode: PropTypes.bool,

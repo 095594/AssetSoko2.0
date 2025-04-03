@@ -21,11 +21,25 @@ class BidPlaced implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        return new Channel('user.' . $this->bid->user_id);
+        return new Channel('bids');
     }
 
     public function broadcastAs()
     {
-        return 'BidPlaced';
+        return 'bid.placed';
+    }
+
+    public function broadcastWith()
+    {
+        return [
+            'bid' => [
+                'id' => $this->bid->id,
+                'amount' => $this->bid->amount,
+                'user_id' => $this->bid->user_id,
+                'asset_id' => $this->bid->asset_id,
+                'created_at' => $this->bid->created_at,
+            ],
+            'message' => 'A new bid has been placed on the asset.',
+        ];
     }
 }

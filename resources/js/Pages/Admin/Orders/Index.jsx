@@ -1,63 +1,112 @@
+import React from "react";
+import { Head, Link } from "@inertiajs/react";
 import AdminLayout from "@/Layouts/AdminLayout";
-import { Head } from "@inertiajs/react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, Button, Badge, Pagination } from "react-bootstrap";
+import { FiEye, FiEdit, FiTrash2 } from "react-icons/fi";
 
-export default function OrdersIndex({ orders }) {
+export default function Index({ orders }) {
     return (
         <AdminLayout>
-            <Head title="Manage Orders" />
-            <h1 className="text-2xl font-bold mb-6">Orders</h1>
+            <Head title="Orders" />
 
-            <div className="bg-white rounded-lg shadow">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Order ID</TableHead>
-                            <TableHead>User</TableHead>
-                            <TableHead>Total Amount</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {orders.data.map((order) => (
-                            <TableRow key={order.id}>
-                                <TableCell>{order.id}</TableCell>
-                                <TableCell>{order.user.name}</TableCell>
-                                <TableCell>${order.total_amount}</TableCell>
-                                <TableCell>{order.status}</TableCell>
-                                <TableCell>
-                                    <Button variant="outline" size="sm" className="mr-2">
-                                        View
+            <div className="container-fluid">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h1 className="h3 mb-0 text-gray-800">Orders</h1>
+                    <Button variant="primary">
+                        Create Order
+                    </Button>
+                </div>
+
+                <div className="card shadow mb-4">
+                    <div className="card-body">
+                        <div className="table-responsive">
+                            <Table hover className="mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Order ID</th>
+                                        <th>Customer</th>
+                                        <th>Date</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {orders.data?.map((order) => (
+                                        <tr key={order.id}>
+                                            <td>#{order.id}</td>
+                                            <td>{order.user?.name}</td>
+                                            <td>{new Date(order.created_at).toLocaleDateString()}</td>
+                                            <td>${order.total.toFixed(2)}</td>
+                                            <td>
+                                                <Badge bg={getStatusColor(order.status)}>
+                                                    {order.status}
+                                                </Badge>
+                                            </td>
+                                            <td>
+                                                <Button
+                                                    variant="outline-primary"
+                                                    size="sm"
+                                                    className="me-2"
+                                                >
+                                                    <FiEye />
+                                                </Button>
+                                                <Button
+                                                    variant="outline-warning"
+                                                    size="sm"
+                                                    className="me-2"
+                                                >
+                                                    <FiEdit />
                                     </Button>
-                                    <Button variant="destructive" size="sm">
-                                        Cancel
+                                                <Button
+                                                    variant="outline-danger"
+                                                    size="sm"
+                                                >
+                                                    <FiTrash2 />
                                     </Button>
-                                </TableCell>
-                            </TableRow>
+                                            </td>
+                                        </tr>
                         ))}
-                    </TableBody>
+                                </tbody>
                 </Table>
             </div>
 
             {/* Pagination */}
-            <div className="mt-6 flex justify-between items-center">
-                <div className="text-sm text-gray-600">
-                    Showing {orders.from} to {orders.to} of {orders.total} orders
+                        {orders.links && (
+                            <div className="d-flex justify-content-center mt-4">
+                                <Pagination>
+                                    {orders.links.map((link, index) => (
+                                        <Pagination.Item
+                                            key={index}
+                                            active={link.active}
+                                            disabled={!link.url}
+                                            as={Link}
+                                            href={link.url}
+                                        >
+                                            {link.label === '&laquo; Previous' ? '«' : 
+                                             link.label === 'Next &raquo;' ? '»' : 
+                                             link.label}
+                                        </Pagination.Item>
+                                    ))}
+                                </Pagination>
                 </div>
-                <div className="flex gap-2">
-                    {orders.prev_page_url && (
-                        <Link href={orders.prev_page_url}>
-                            <Button variant="outline">Previous</Button>
-                        </Link>
-                    )}
-                    {orders.next_page_url && (
-                        <Link href={orders.next_page_url}>
-                            <Button variant="outline">Next</Button>
-                        </Link>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
         </AdminLayout>
     );
+}
+
+function getStatusColor(status) {
+    switch (status?.toLowerCase()) {
+        case 'pending':
+            return 'warning';
+        case 'completed':
+            return 'success';
+        case 'cancelled':
+            return 'danger';
+        default:
+            return 'secondary';
+    }
 }

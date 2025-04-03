@@ -75,4 +75,41 @@ class BidController extends Controller
 
         return back()->with('success', 'Bid placed successfully!');
     }
+
+    public function stats()
+    {
+        $user = auth()->user();
+        
+        $totalBids = $user->bids()->count();
+        
+        $activeBids = $user->bids()
+            ->whereHas('asset', function($query) {
+                $query->where('auction_end_time', '>', now())
+                      ->where('status', 'active');
+            })
+            ->count();
+        
+        $wonBids = $user->bids()
+            ->whereHas('asset', function($query) {
+                $query->where('auction_end_time', '<', now())
+                      ->where('status', 'completed');
+            })
+            ->where('is_winning', true)
+            ->count();
+        
+        $lostBids = $user->bids()
+            ->whereHas('asset', function($query) {
+                $query->where('auction_end_time', '<', now())
+                      ->where('status', 'completed');
+            })
+            ->where('is_winning', false)
+            ->count();
+
+        return response()->json([
+            'totalBids' => $totalBids,
+            'activeBids' => $activeBids,
+            'wonBids' => $wonBids,
+            'lostBids' => $lostBids
+        ]);
+    }
 }

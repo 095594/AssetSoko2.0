@@ -12,6 +12,7 @@ class Notification extends Model
 
     protected $fillable = [
         'user_id',
+        'asset_id',
         'type',
         'message',
         'data',
@@ -27,5 +28,11 @@ class Notification extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    // A notification belongs to an asset
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class);
     }
 }

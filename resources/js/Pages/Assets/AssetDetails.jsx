@@ -30,11 +30,29 @@ const AssetDetail = ({ asset, auth, darkMode }) => {
             preserveScroll: true,
         });
     };
-    const assetImages = asset.photos && asset.photos.length > 0 
-    ? asset.photos 
-    : asset.image_url 
-    ? [asset.image_url] 
-    : [getFallbackImage(asset.category)];
+    const assetImages = React.useMemo(() => {
+        try {
+            if (asset.photos) {
+                if (Array.isArray(asset.photos)) {
+                    return asset.photos.map(photo => `/storage/${photo}`);
+                }
+                const parsed = JSON.parse(asset.photos);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(photo => `/storage/${photo}`);
+                }
+            }
+            if (asset.image_url) {
+                if (asset.image_url.startsWith('http')) {
+                    return [asset.image_url];
+                }
+                return [`/storage/${asset.image_url}`];
+            }
+            return [getFallbackImage(asset.category)];
+        } catch (e) {
+            console.error('Error processing images:', e);
+            return [getFallbackImage(asset.category)];
+        }
+    }, [asset.photos, asset.image_url, asset.category]);
     return (
         <BuyerLayout>
             <Container className="mt-4">

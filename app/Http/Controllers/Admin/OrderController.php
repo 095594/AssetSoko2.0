@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class OrderController extends Controller
 {
@@ -12,7 +14,25 @@ class OrderController extends Controller
      */
     public function index()
     {
-        //
+        $orders = Order::with('user')
+            ->latest()
+            ->paginate(10)
+            ->through(function ($order) {
+                return [
+                    'id' => $order->id,
+                    'user' => $order->user ? [
+                        'name' => $order->user->name,
+                        'email' => $order->user->email,
+                    ] : null,
+                    'total' => $order->total,
+                    'status' => $order->status,
+                    'created_at' => $order->created_at,
+                ];
+            });
+
+        return Inertia::render('Admin/Orders/Index', [
+            'orders' => $orders
+        ]);
     }
 
     /**

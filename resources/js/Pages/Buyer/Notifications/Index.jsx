@@ -1,147 +1,114 @@
-import React, { useState, useEffect } from "react";
-import { Head, usePage, Link } from "@inertiajs/react";
-import BuyerLayout from "@/Layouts/BuyerLayout";
-import { Container, Card, ListGroup, Badge, Button, Spinner } from "react-bootstrap";
-import { FiBell, FiArrowLeft, FiCheck, FiX, FiDollarSign, FiClock } from "react-icons/fi";
+import React from 'react';
+import { Head, Link } from '@inertiajs/react';
+import BuyerLayout from '@/Layouts/BuyerLayout';
+import { Container, Card, Table, Button, Badge } from 'react-bootstrap';
+import { FiBell, FiCheck, FiCheckCircle } from 'react-icons/fi';
 
-const NotificationItem = ({ notification }) => {
-    const getIcon = () => {
-        switch (notification.type) {
-            case 'bid':
-                return <FiDollarSign className="text-primary" />;
-            case 'auction_end':
-                return <FiClock className="text-warning" />;
-            default:
-                return <FiBell className="text-info" />;
-        }
+const Notifications = ({ notifications, darkMode }) => {
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     };
 
-    const getBadgeColor = () => {
-        switch (notification.type) {
-            case 'bid':
-                return 'primary';
-            case 'auction_end':
-                return 'warning';
-            default:
-                return 'info';
-        }
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'KSH'
+        }).format(amount);
     };
 
     return (
-        <ListGroup.Item className="border-0 border-bottom py-3">
-            <div className="d-flex align-items-start">
-                <div className="me-3">
-                    {getIcon()}
-                </div>
-                <div className="flex-grow-1">
-                    <div className="d-flex justify-content-between align-items-start mb-1">
-                        <h6 className="mb-1">{notification.title}</h6>
-                        <Badge bg={getBadgeColor()} className="ms-2">
-                            {notification.type}
-                        </Badge>
-                    </div>
-                    <p className="text-muted mb-2">{notification.message}</p>
-                    <div className="d-flex justify-content-between align-items-center">
-                        <small className="text-muted">
-                            {new Date(notification.created_at).toLocaleString()}
-                        </small>
-                        {notification.asset_id && (
-                            <Link 
-                                href={`/buyer/assets/${notification.asset_id}`}
-                                className="btn btn-sm btn-outline-primary"
-                            >
-                                View Asset
-                            </Link>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </ListGroup.Item>
-    );
-};
-
-const Notifications = () => {
-    const { props } = usePage();
-    const { notifications: initialNotifications = [], auth } = props;
-    const [notifications, setNotifications] = useState(initialNotifications);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        if (auth?.user?.id && window.Echo) {
-            const echo = window.Echo;
-            echo.private(`private-user.${auth.user.id}`)
-                .listen('NewNotification', (data) => {
-                    setNotifications(prev => [data.notification, ...prev]);
-                });
-
-            return () => {
-                echo.leave(`private-user.${auth.user.id}`);
-            };
-        }
-    }, [auth?.user?.id]);
-
-    const markAllAsRead = () => {
-        // TODO: Implement mark all as read functionality
-        setNotifications(prev => 
-            prev.map(notification => ({ ...notification, read: true }))
-        );
-    };
-
-    return (
-        <BuyerLayout>
+        <BuyerLayout darkMode={darkMode}>
             <Head title="Notifications" />
-            <Container className="mt-4">
+            <Container className="py-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h3 className="mb-1">Notifications</h3>
-                        <p className="text-muted mb-0">Stay updated with your auction activities</p>
-                    </div>
-                    <div>
-                        <Button 
-                            variant="outline-primary" 
-                            className="me-2"
-                            onClick={markAllAsRead}
+                    <h2>Notifications</h2>
+                    <div className="d-flex gap-2">
+                        <Button
+                            variant="primary"
+                            onClick={() => window.location.href = route('notifications.markAllAsRead')}
                         >
-                            <FiCheck className="me-2" /> Mark All as Read
+                            <FiCheck className="me-2" />
+                            Mark All as Read
                         </Button>
-                        <Link href={route('buyer.dashboard')} className="btn btn-outline-secondary">
-                            <FiArrowLeft className="me-2" /> Back to Dashboard
-                        </Link>
                     </div>
                 </div>
 
-                {loading ? (
-                    <div className="text-center py-5">
-                        <Spinner animation="border" role="status">
-                            <span className="visually-hidden">Loading...</span>
-                        </Spinner>
-                    </div>
-                ) : notifications.length > 0 ? (
-                    <Card className="shadow-sm border-0">
-                        <ListGroup variant="flush">
-                            {notifications.map((notification) => (
-                                <NotificationItem 
-                                    key={notification.id} 
-                                    notification={notification} 
-                                />
-                            ))}
-                        </ListGroup>
-                    </Card>
-                ) : (
-                    <Card className="shadow-sm border-0">
-                        <Card.Body className="text-center py-5">
-                            <FiBell className="display-4 text-muted mb-3" />
-                            <h5>No Notifications</h5>
-                            <p className="text-muted">You're all caught up!</p>
-                            <Link 
-                                href={route('buyer.assets.index')} 
-                                className="btn btn-primary"
-                            >
-                                Browse Assets
-                            </Link>
-                        </Card.Body>
-                    </Card>
-                )}
+                <Card className={darkMode ? "bg-dark text-light" : ""}>
+                    <Card.Body>
+                        <Table responsive hover variant={darkMode ? "dark" : ""}>
+                            <thead>
+                                <tr>
+                                    <th>Message</th>
+                                    <th>Asset</th>
+                                    <th>Bidder</th>
+                                    <th>Bid Amount</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {notifications.data.map((notification) => (
+                                    <tr key={notification.id} className={notification.read_at ? "" : "fw-bold"}>
+                                        <td>{notification.data.message}</td>
+                                        <td>
+                                            {notification.asset ? (
+                                                <Link 
+                                                    href={route('buyer.assets.show', notification.asset.id)}
+                                                    className={darkMode ? "text-light" : ""}
+                                                >
+                                                    {notification.asset.name}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-muted">N/A</span>
+                                            )}
+                                        </td>
+                                        <td>
+                                            {notification.bid?.user ? (
+                                                <span>
+                                                    {notification.bid.user.company_name || notification.bid.user.name}
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted">N/A</span>
+                                            )}
+                                        </td>
+                                        <td>
+                                            {notification.bid ? (
+                                                <span>{formatCurrency(notification.bid.amount)}</span>
+                                            ) : (
+                                                <span className="text-muted">N/A</span>
+                                            )}
+                                        </td>
+                                        <td>{formatDate(notification.created_at)}</td>
+                                        <td>
+                                            <Badge bg={notification.read_at ? "secondary" : "primary"}>
+                                                {notification.read_at ? "Read" : "Unread"}
+                                            </Badge>
+                                        </td>
+                                        <td>
+                                            {!notification.read_at && (
+                                                <Button
+                                                    variant="outline-primary"
+                                                    size="sm"
+                                                    onClick={() => window.location.href = route('notifications.markAsRead', notification.id)}
+                                                >
+                                                    <FiCheckCircle className="me-1" />
+                                                    Mark as Read
+                                                </Button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    </Card.Body>
+                </Card>
             </Container>
         </BuyerLayout>
     );

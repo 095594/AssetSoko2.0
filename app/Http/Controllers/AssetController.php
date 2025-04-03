@@ -227,17 +227,42 @@ class AssetController extends Controller
             ->where('status', 'active')
             ->where('auction_end_time', '>', now());
 
-        // Apply filters if provided
+        // Search by name
+        if ($request->has('name') && !empty($request->name)) {
+            $query->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($request->name) . '%']);
+        }
+
+        // Apply category filter
         if ($request->filled('category')) {
             $query->where('category', $request->category);
         }
 
+        // Apply price filters
         if ($request->filled('min_price')) {
-            $query->where('base_price', '>=', $request->min_price);
+            $query->where('current_price', '>=', $request->min_price);
         }
 
         if ($request->filled('max_price')) {
-            $query->where('base_price', '<=', $request->max_price);
+            $query->where('current_price', '<=', $request->max_price);
+        }
+
+        // Apply sorting
+        switch ($request->input('sort', 'newest')) {
+            case 'oldest':
+                $query->oldest();
+                break;
+            case 'price_asc':
+                $query->orderBy('current_price');
+                break;
+            case 'price_desc':
+                $query->orderBy('current_price', 'desc');
+                break;
+            case 'ending_soon':
+                $query->orderBy('auction_end_time');
+                break;
+            default: // newest
+                $query->latest();
+                break;
         }
 
         // Add watchlist status if user is authenticated
@@ -247,7 +272,7 @@ class AssetController extends Controller
             }]);
         }
 
-        $assets = $query->latest()->paginate(12);
+        $assets = $query->paginate(12)->withQueryString();
 
         // Add is_watched property to each asset
         if (auth()->check()) {
@@ -259,7 +284,8 @@ class AssetController extends Controller
 
         return Inertia::render('Buyer/BrowseAssets', [
             'assets' => $assets,
-            'filters' => $request->only(['category', 'min_price', 'max_price'])
+            'filters' => $request->only(['name', 'category', 'min_price', 'max_price', 'sort']),
+            'categories' => Asset::distinct()->pluck('category') // Add this to send available categories
         ]);
     }
 }

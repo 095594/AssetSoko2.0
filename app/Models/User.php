@@ -17,6 +17,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'status',
         'is_admin',
         'dark_mode',
         'email_notifications',
@@ -25,6 +27,7 @@ class User extends Authenticatable
         'company_name',
         'phone',
         'address',
+        'last_active',
     ];
 
     protected $hidden = [
@@ -40,6 +43,7 @@ class User extends Authenticatable
         'email_notifications' => 'boolean',
         'bid_notifications' => 'boolean',
         'auction_notifications' => 'boolean',
+        'last_active' => 'datetime',
     ];
 
     // ... rest of your model code ...
@@ -47,7 +51,7 @@ class User extends Authenticatable
     // Relationship with assets (for sellers)
     public function assets(): HasMany
     {
-        return $this->hasMany(Asset::class, 'user_id');
+        return $this->hasMany(Asset::class, 'seller_id');
     }
 
     // Relationship with bids (for buyers)
@@ -61,6 +65,24 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Asset::class, 'watchlist')
             ->withTimestamps();
+    }
+
+    // Relationship with orders (for buyers)
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class, 'buyer_id');
+    }
+
+    // Relationship with sales (for sellers)
+    public function sales(): HasMany
+    {
+        return $this->hasMany(Order::class, 'seller_id');
+    }
+
+    // Relationship with asset views
+    public function assetViews(): HasMany
+    {
+        return $this->hasMany(AssetView::class);
     }
 
     // Check if user is admin
@@ -79,5 +101,17 @@ class User extends Authenticatable
     public function hasBids(): bool
     {
         return $this->bids()->exists();
+    }
+
+    // Check if user is active
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    // Update last active timestamp
+    public function updateLastActive()
+    {
+        $this->update(['last_active' => now()]);
     }
 }

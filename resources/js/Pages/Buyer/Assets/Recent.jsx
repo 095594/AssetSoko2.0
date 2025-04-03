@@ -12,20 +12,24 @@ const AssetCard = ({ asset }) => {
         try {
             if (asset.photos) {
                 if (Array.isArray(asset.photos)) {
-                    return asset.photos[0];
+                    return `/storage/${asset.photos[0]}`;
                 }
                 
                 const parsed = JSON.parse(asset.photos);
                 if (Array.isArray(parsed)) {
-                    return parsed[0];
+                    return `/storage/${parsed[0]}`;
                 }
             }
-            if (typeof asset.photos === 'string' && asset.photos.trim().startsWith('assets/')) {
-                return asset.photos;
+            if (asset.image_url) {
+                if (asset.image_url.startsWith('http')) {
+                    return asset.image_url;
+                }
+                return `/storage/${asset.image_url}`;
             }
-            return asset.image_url;
+            return getFallbackImage(asset.category);
         } catch (e) {
-            return asset.image_url;
+            console.error('Error getting image:', e);
+            return getFallbackImage(asset.category);
         }
     };
 

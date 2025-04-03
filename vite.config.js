@@ -3,14 +3,9 @@ import laravel from 'laravel-vite-plugin';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-    input: [
-        'resources/js/app.jsx',
-        'resources/css/app.css', // Include CSS if necessary
-    ],
-    
     plugins: [
         laravel({
-            input: 'resources/js/app.jsx',
+            input: ['resources/js/app.jsx', 'resources/css/app.css'],
             refresh: true,
         }),
         react(),
@@ -18,13 +13,14 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': '/resources/js',
-            '@/Layouts': '/resources/js/Layouts', // Add this line
+            '@/Layouts': '/resources/js/Layouts',
+            '@/Pages': '/resources/js/Pages',
+            '@/Components': '/resources/js/Components',
+            '@/components': '/resources/js/Components',
         },
     },
-    plugins: [react()],
     define: {
-      'process.env': {},
+        'process.env': {},
     },
-  
 });
  

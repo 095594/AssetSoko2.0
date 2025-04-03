@@ -2,31 +2,38 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
-    //
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
+        'asset_id',
         'total_amount',
         'status',
         'shipping_address',
         'billing_address',
     ];
-    
-    public function user()
+
+    protected $casts = [
+        'total_amount' => 'decimal:2',
+    ];
+
+    public function asset()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Asset::class);
     }
-    
-    public function orderItems()
+
+    public function buyer()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
-    
-    public function invoice()
+
+    public function seller()
     {
-        return $this->hasOne(Invoice::class);
+        return $this->belongsTo(User::class, 'seller_id');
     }
 }

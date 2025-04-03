@@ -1,91 +1,134 @@
-import AdminLayout from "@/Layouts/AdminLayout";
+import React, { useState } from "react";
 import { Head, useForm } from "@inertiajs/react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import AdminLayout from "@/Layouts/AdminLayout";
+import { Container, Card, Form, Button, Alert, Row, Col } from "react-bootstrap";
+import { FiSave, FiUser, FiShield } from "react-icons/fi";
 
-export default function EditUser({ user }) {
-    const { data, setData, put, errors, processing } = useForm({
+const UserEdit = ({ user }) => {
+    const { data, setData, put, processing, errors } = useForm({
         name: user.name,
         email: user.email,
         role: user.role,
-        password: "",
-        password_confirmation: "",
+        is_admin: user.is_admin,
     });
 
-    const submit = (e) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
-        put(route("admin.users.update", user.id));
+        put(route('admin.users.update', user.id));
     };
+
+    const roles = [
+        { id: 'buyer', name: 'Buyer' },
+        { id: 'seller', name: 'Seller' },
+        { id: 'admin', name: 'Admin' },
+    ];
 
     return (
         <AdminLayout>
-            <Head title="Edit User" />
-            <h1 className="text-2xl font-bold mb-6">Edit User</h1>
-
-            <div className="bg-white p-6 rounded-lg shadow">
-                <form onSubmit={submit}>
-                    <div className="mb-4">
-                        <Label>Name</Label>
-                        <Input
-                            value={data.name}
-                            onChange={(e) => setData("name", e.target.value)}
-                        />
-                        {errors.name && <p className="text-red-500">{errors.name}</p>}
+            <Head title={`Edit User - ${user.name}`} />
+            <Container className="mt-4">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h3>Edit User</h3>
+                    <Button
+                        variant="outline-secondary"
+                        href={route('admin.users.index')}
+                    >
+                        Back to Users
+                    </Button>
                     </div>
 
-                    <div className="mb-4">
-                        <Label>Email</Label>
-                        <Input
+                <Card className="shadow-sm border-0">
+                    <Card.Body>
+                        <Form onSubmit={handleSubmit}>
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Name</Form.Label>
+                                        <Form.Control
+                                            type="text"
+                                            value={data.name}
+                                            onChange={e => setData('name', e.target.value)}
+                                            isInvalid={!!errors.name}
+                                        />
+                                        <Form.Control.Feedback type="invalid">
+                                            {errors.name}
+                                        </Form.Control.Feedback>
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Email</Form.Label>
+                                        <Form.Control
                             type="email"
                             value={data.email}
-                            onChange={(e) => setData("email", e.target.value)}
-                        />
-                        {errors.email && <p className="text-red-500">{errors.email}</p>}
-                    </div>
+                                            onChange={e => setData('email', e.target.value)}
+                                            isInvalid={!!errors.email}
+                                        />
+                                        <Form.Control.Feedback type="invalid">
+                                            {errors.email}
+                                        </Form.Control.Feedback>
+                                    </Form.Group>
+                                </Col>
+                            </Row>
 
-                    <div className="mb-4">
-                        <Label>Role</Label>
-                        <select
-                            className="border rounded w-full p-2"
+                            <Row>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Role</Form.Label>
+                                        <Form.Select
                             value={data.role}
-                            onChange={(e) => setData("role", e.target.value)}
-                        >
-                            <option value="admin">Admin</option>
-                            <option value="user">User</option>
-                        </select>
-                        {errors.role && <p className="text-red-500">{errors.role}</p>}
-                    </div>
+                                            onChange={e => setData('role', e.target.value)}
+                                            isInvalid={!!errors.role}
+                                        >
+                                            {roles.map(role => (
+                                                <option key={role.id} value={role.id}>
+                                                    {role.name}
+                                                </option>
+                                            ))}
+                                        </Form.Select>
+                                        <Form.Control.Feedback type="invalid">
+                                            {errors.role}
+                                        </Form.Control.Feedback>
+                                    </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Admin Access</Form.Label>
+                                        <Form.Check
+                                            type="switch"
+                                            id="admin-switch"
+                                            label="Grant admin privileges"
+                                            checked={data.is_admin}
+                                            onChange={e => setData('is_admin', e.target.checked)}
+                                        />
+                                        <Form.Text className="text-muted">
+                                            Admin users have full access to the platform's administrative features.
+                                        </Form.Text>
+                                    </Form.Group>
+                                </Col>
+                            </Row>
 
-                    <div className="mb-4">
-                        <Label>Password (Leave blank to keep current password)</Label>
-                        <Input
-                            type="password"
-                            value={data.password}
-                            onChange={(e) => setData("password", e.target.value)}
-                        />
-                        {errors.password && <p className="text-red-500">{errors.password}</p>}
-                    </div>
+                            <Alert variant="info" className="mb-4">
+                                <FiShield className="me-2" />
+                                <strong>Note:</strong> Changing a user's role or admin status will affect their access to various features of the platform. Please ensure this change is necessary and authorized.
+                            </Alert>
 
-                    <div className="mb-4">
-                        <Label>Confirm Password</Label>
-                        <Input
-                            type="password"
-                            value={data.password_confirmation}
-                            onChange={(e) => setData("password_confirmation", e.target.value)}
-                        />
-                    </div>
-
-                    <div className="flex gap-4">
-                        <Button type="submit" disabled={processing}>
-                            Save Changes
+                            <div className="d-flex justify-content-end">
+                                <Button
+                                    type="submit"
+                                    variant="primary"
+                                    disabled={processing}
+                                >
+                                    <FiSave className="me-2" />
+                                    {processing ? 'Saving...' : 'Save Changes'}
                         </Button>
-                        <Button variant="outline" href={route("admin.users.index")}>
-                            Cancel
-                        </Button>
                     </div>
-                </form>
-            </div>
+                        </Form>
+                    </Card.Body>
+                </Card>
+            </Container>
         </AdminLayout>
     );
-}
+};
+
+export default UserEdit;

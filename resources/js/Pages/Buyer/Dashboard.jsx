@@ -2,9 +2,22 @@ import React, { useState, useEffect } from "react";
 import { Head, usePage, Link } from "@inertiajs/react";
 import BuyerLayout from "@/Layouts/BuyerLayout";
 import { Container, Card, Table, Row, Col, Badge, Button, ListGroup } from "react-bootstrap";
-import { FiClock, FiDollarSign, FiEye, FiBell, FiShoppingCart, FiTrendingUp, FiBarChart2, FiPieChart, FiArrowRight } from "react-icons/fi";
+import { 
+    FiClock, 
+    FiDollarSign, 
+    FiEye, 
+    FiBell, 
+    FiShoppingCart, 
+    FiTrendingUp, 
+    FiBarChart2, 
+    FiPieChart, 
+    FiArrowRight,
+    FiCheckCircle,
+    FiXCircle
+} from "react-icons/fi";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar, Line, Pie } from 'react-chartjs-2';
+import axios from 'axios';
 
 // Register ChartJS components
 ChartJS.register(
@@ -147,42 +160,77 @@ const PriceDistributionChart = ({ assets }) => {
 };
 
 const BidStatusChart = ({ bids }) => {
-  const leadingBids = bids.filter(bid => bid.amount >= (bid.current_bid || 0)).length;
-  const outbidBids = bids.length - leadingBids;
+    const [chartData, setChartData] = useState({
+        labels: [],
+        datasets: [
+            {
+                label: 'Bid Amount',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }
+        ]
+    });
 
-  const data = {
-    labels: ['Leading Bids', 'Outbid'],
-    datasets: [
-      {
-        label: 'Bid Status',
-        data: [leadingBids, outbidBids],
-        backgroundColor: [
-          'rgba(75, 192, 192, 0.5)',
-          'rgba(255, 99, 132, 0.5)',
-        ],
-        borderColor: [
-          'rgba(75, 192, 192, 1)',
-          'rgba(255, 99, 132, 1)',
-        ],
-        borderWidth: 1,
-      },
-    ],
-  };
+    useEffect(() => {
+        if (bids && bids.length > 0) {
+            const sortedBids = [...bids].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            
+            const labels = sortedBids.map(bid => 
+                new Date(bid.created_at).toLocaleDateString()
+            );
+            
+            const data = sortedBids.map(bid => bid.amount);
 
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'Your Bid Status',
-      },
-    },
-  };
+            setChartData({
+                labels,
+                datasets: [
+                    {
+                        label: 'Bid Amount',
+                        data,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }
+                ]
+            });
+        }
+    }, [bids]);
 
-  return <Pie options={options} data={data} />;
+    const options = {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            title: {
+                display: true,
+                text: 'Bid History'
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                title: {
+                    display: true,
+                    text: 'Amount (Ksh)'
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Date'
+                }
+            }
+        }
+    };
+
+    return (
+        <Card className="mb-4">
+            <Card.Body>
+                <Line data={chartData} options={options} />
+            </Card.Body>
+        </Card>
+    );
 };
 
 const Dashboard = () => {
@@ -200,6 +248,13 @@ const Dashboard = () => {
     const [newNotifications, setNewNotifications] = useState(notifications);
     const [unreadCount, setUnreadCount] = useState(notifications.filter(n => !n.read_at).length);
     const [watchlist, setWatchlist] = useState(initialWatchlist);
+    const [loading, setLoading] = useState(false);
+    const [bidStats, setBidStats] = useState({
+        totalBids: 0,
+        activeBids: 0,
+        wonBids: 0,
+        lostBids: 0
+    });
 
     useEffect(() => {
         if (auth?.user?.id && window.Echo) {
@@ -232,6 +287,22 @@ const Dashboard = () => {
             };
         }
     }, [auth?.user?.id]);
+
+    useEffect(() => {
+        const fetchBidStats = async () => {
+            try {
+                setLoading(true);
+                const response = await axios.get(route('buyer.bids.stats'));
+                setBidStats(response.data);
+            } catch (error) {
+                console.error('Error fetching bid stats:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchBidStats();
+    }, []);
 
     const markAsRead = (id) => {
         setNewNotifications(prev => 
@@ -302,6 +373,46 @@ const Dashboard = () => {
                                 >
                                     View Details <FiArrowRight className="ms-2" />
                                 </Link>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
+
+                {/* Stats Cards */}
+                <Row className="mb-4">
+                    <Col md={3}>
+                        <Card className="text-center">
+                            <Card.Body>
+                                <FiTrendingUp size={24} className="mb-2" />
+                                <h5>Total Bids</h5>
+                                <h3>{bidStats.totalBids}</h3>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                    <Col md={3}>
+                        <Card className="text-center">
+                            <Card.Body>
+                                <FiClock size={24} className="mb-2" />
+                                <h5>Active Bids</h5>
+                                <h3>{bidStats.activeBids}</h3>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                    <Col md={3}>
+                        <Card className="text-center">
+                            <Card.Body>
+                                <FiCheckCircle size={24} className="mb-2" />
+                                <h5>Won Bids</h5>
+                                <h3>{bidStats.wonBids}</h3>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                    <Col md={3}>
+                        <Card className="text-center">
+                            <Card.Body>
+                                <FiXCircle size={24} className="mb-2" />
+                                <h5>Lost Bids</h5>
+                                <h3>{bidStats.lostBids}</h3>
                             </Card.Body>
                         </Card>
                     </Col>

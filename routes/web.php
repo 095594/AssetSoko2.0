@@ -22,6 +22,8 @@ use App\Http\Controllers\Seller\AssetController as SellerAssetController;
 use App\Http\Controllers\Seller\BidController as SellerBidController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\Admin\AdminSettingsController;
 
 // Broadcasting Routes
 Broadcast::routes(['middleware' => ['web', 'auth']]);
@@ -66,10 +68,8 @@ Route::middleware(['auth'])->group(function () {
         $user = auth()->user();
         
         return match ($user->role) {
-            'admin'  => redirect('/admin/dashboard'),
-            'seller' => redirect('/seller/dashboard'),
-            'buyer'  => redirect('/buyer/dashboard'),
-            default  => Inertia::render('Dashboard'),
+            'admin' => redirect()->route('admin.dashboard'),
+            default => redirect()->route('buyer.dashboard'),
         };
     })->name('dashboard');
 
@@ -92,6 +92,9 @@ Route::middleware(['auth'])->group(function () {
     // Payment routes
     Route::post('/payments/{asset}/initiate', [PaymentController::class, 'initiatePayment'])->name('payments.initiate');
     Route::get('/payments/{asset}/status', [PaymentController::class, 'showPaymentStatus'])->name('payments.status');
+
+    // Bid statistics route
+    Route::get('/buyer/bids/stats', [BidController::class, 'stats'])->name('buyer.bids.stats');
 });
 
 // Admin Routes
@@ -99,7 +102,18 @@ Route::middleware(['auth', EnsureUserIsAdmin::class])->prefix('admin')->group(fu
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
     Route::resource('/assets', AdminAssetController::class)->names('admin.assets');
     Route::resource('/users', UserController::class)->names('admin.users');
-    Route::resource('/orders', OrderController::class)->names('admin.orders');
+    Route::resource('/orders', \App\Http\Controllers\Admin\OrderController::class)->names('admin.orders');
+    
+    // Reports Routes
+    Route::get('/reports', [ReportController::class, 'index'])->name('admin.reports.index');
+    Route::get('/reports/sales', [ReportController::class, 'sales'])->name('admin.reports.sales');
+    Route::get('/reports/users', [ReportController::class, 'users'])->name('admin.reports.users');
+    Route::get('/reports/assets', [ReportController::class, 'assets'])->name('admin.reports.assets');
+    Route::get('/reports/export/{type}/{format}', [ReportController::class, 'export'])->name('admin.reports.export');
+    
+    // Settings Routes
+    Route::get('/settings', [AdminSettingsController::class, 'index'])->name('admin.settings.index');
+    Route::put('/settings', [AdminSettingsController::class, 'update'])->name('admin.settings.update');
 });
 
 Route::put('/profile/theme', [ProfileController::class, 'updateTheme'])
@@ -136,3 +150,8 @@ Route::middleware(['auth'])->prefix('seller')->group(function () {
 
 // M-Pesa callback route (no auth required)
 Route::post('/payments/mpesa/callback', [PaymentController::class, 'mpesaCallback'])->name('payments.mpesa.callback');
+
+Route::get('/test-pusher', function () {
+    event(new App\Events\TestEvent('Hello from Pusher!'));
+    return 'Test event dispatched!';
+});

@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { usePage } from '@inertiajs/inertia-react';
 
+Pusher.log = function(msg) {
+    console.log('Pusher Log:', msg);
+};
+
 export default function NotificationBell() {
     const { auth } = usePage().props;
     const [notifications, setNotifications] = useState([]);

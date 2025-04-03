@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Notification;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -12,38 +11,52 @@ class NotificationController extends Controller
     {
         $notifications = auth()->user()
             ->notifications()
-            ->with(['asset'])
             ->latest()
-            ->paginate(20)
-            ->withQueryString();
+            ->paginate(10);
+
+        // Transform notifications to include asset and bidder data
+        $notifications->getCollection()->transform(function ($notification) {
+            $data = $notification->data;
+            
+            // Get asset information
+            if (isset($data['asset_id'])) {
+                $asset = \App\Models\Asset::select('id', 'name', 'current_price', 'auction_end_time')
+                    ->with(['user' => function($query) {
+                        $query->select('id', 'name', 'company_name');
+                    }])
+                    ->find($data['asset_id']);
+                $notification->asset = $asset;
+            }
+
+            // Get bidder information if it's a bid notification
+            if (isset($data['bid_id'])) {
+                $bid = \App\Models\Bid::select('id', 'user_id', 'amount')
+                    ->with(['user' => function($query) {
+                        $query->select('id', 'name', 'company_name');
+                    }])
+                    ->find($data['bid_id']);
+                $notification->bid = $bid;
+            }
+
+            return $notification;
+        });
 
         return Inertia::render('Buyer/Notifications/Index', [
             'notifications' => $notifications,
-            'darkMode' => auth()->user()->dark_mode,
+            'darkMode' => auth()->user()->dark_mode
         ]);
     }
 
-    public function markAsRead(Notification $notification)
+    public function markAsRead($id)
     {
-        // Ensure the notification belongs to the authenticated user
-        if ($notification->user_id !== auth()->id()) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        if (!$notification->read_at) {
-            $notification->update(['read_at' => now()]);
-        }
-
-        return response()->noContent();
+        $notification = auth()->user()->notifications()->findOrFail($id);
+        $notification->markAsRead();
+        return back();
     }
 
     public function markAllAsRead()
     {
-        auth()->user()
-            ->notifications()
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
-
-        return response()->noContent();
+        auth()->user()->unreadNotifications->markAsRead();
+        return back();
     }
 }
