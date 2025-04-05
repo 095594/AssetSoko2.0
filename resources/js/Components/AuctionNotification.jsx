@@ -11,7 +11,8 @@ export default function AuctionNotification({ auth }) {
 
         // Subscribe to the user's private channel
         window.Echo.private(`user.${auth.user.id}`)
-            .listen('AuctionCompleted', (e) => {
+            .listen('.AuctionCompleted', (e) => {
+                console.log('Auction completed event received:', e);
                 setNotification(e);
                 setShow(true);
             });
@@ -45,7 +46,7 @@ export default function AuctionNotification({ auth }) {
                             <strong>Asset Details:</strong>
                             <ul className="list-unstyled">
                                 <li>Name: {notification.asset.name}</li>
-                                <li>Winning Bid: ${notification.asset.price}</li>
+                                <li>Winning Bid: Ksh {notification.asset.price.toLocaleString()}</li>
                             </ul>
                         </div>
                     </>

@@ -30,16 +30,30 @@ class PaymentController extends Controller
             return back()->with('error', 'No winning bid found for this asset.');
         }
 
-        // Create payment record
-        $payment = Payment::create([
-            'asset_id' => $asset->id,
-            'bid_id' => $winningBid->id,
-            'buyer_id' => $winningBid->user_id,
-            'seller_id' => $asset->user_id,
-            'amount' => $winningBid->amount,
-            'payment_method' => $request->payment_method,
-            'status' => 'pending'
-        ]);
+        // Check if payment already exists
+        $existingPayment = Payment::where('asset_id', $asset->id)
+            ->where('bid_id', $winningBid->id)
+            ->first();
+
+        if ($existingPayment) {
+            // If payment exists but is pending, use it
+            if ($existingPayment->status === 'pending') {
+                $payment = $existingPayment;
+            } else {
+                return back()->with('error', 'Payment has already been processed for this asset.');
+            }
+        } else {
+            // Create payment record
+            $payment = Payment::create([
+                'asset_id' => $asset->id,
+                'bid_id' => $winningBid->id,
+                'buyer_id' => $winningBid->user_id,
+                'seller_id' => $asset->user_id,
+                'amount' => $winningBid->amount,
+                'payment_method' => $request->payment_method ?? 'pending',
+                'status' => 'pending'
+            ]);
+        }
 
         // Handle different payment methods
         switch ($request->payment_method) {

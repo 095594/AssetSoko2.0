@@ -127,6 +127,7 @@ Route::middleware(['auth'])->prefix('buyer')->group(function () {
     Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('buyer.assets.show');
     Route::post('/assets/{asset}/bid', [BidController::class, 'store'])->name('buyer.bids.store');
     Route::get('/bids', [BidController::class, 'index'])->name('buyer.bids.index');
+    Route::get('/bids/won', [BidController::class, 'won'])->name('buyer.bids.won');
     Route::get('/watchlist', [WatchlistController::class, 'index'])->name('buyer.watchlist');
     Route::post('/watchlist/{asset}/toggle', [WatchlistController::class, 'toggle'])->name('buyer.watchlist.toggle');
 });

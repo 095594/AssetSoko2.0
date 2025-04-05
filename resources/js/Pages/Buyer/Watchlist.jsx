@@ -1,8 +1,10 @@
 import React from 'react';
 import { Container, Row, Col, Card, Button, Badge } from 'react-bootstrap';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import BuyerLayout from '@/Layouts/BuyerLayout';
-import { FiClock, FiEyeOff } from 'react-icons/fi';
+import { FiClock, FiEyeOff, FiX } from 'react-icons/fi';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Watchlist = ({ watchlist, darkMode }) => {
     const getAssetImage = (asset) => {
@@ -26,10 +28,20 @@ const Watchlist = ({ watchlist, darkMode }) => {
         }
     };
 
+    const removeFromWatchlist = async (assetId) => {
+        try {
+            await router.post(route('buyer.watchlist.toggle', assetId));
+            toast.success('Asset removed from watchlist');
+        } catch (error) {
+            toast.error('Failed to remove asset from watchlist');
+        }
+    };
+
     return (
         <BuyerLayout>
             <Container className="mt-4">
                 <h4 className="text-center mb-4">My Watchlist</h4>
+                <ToastContainer />
 
                 {watchlist.length === 0 ? (
                     <Card className={`text-center ${darkMode ? "bg-dark text-light" : "bg-light"}`}>
@@ -63,7 +75,17 @@ const Watchlist = ({ watchlist, darkMode }) => {
                                             onError={(e) => (e.target.src = getFallbackImage(asset.category))}
                                         />
                                         <Card.Body>
-                                            <Card.Title>{asset.name}</Card.Title>
+                                            <div className="d-flex justify-content-between align-items-start">
+                                                <Card.Title>{asset.name}</Card.Title>
+                                                <Button 
+                                                    variant="outline-danger" 
+                                                    size="sm"
+                                                    onClick={() => removeFromWatchlist(asset.id)}
+                                                    title="Remove from watchlist"
+                                                >
+                                                    <FiX />
+                                                </Button>
+                                            </div>
                                             <Card.Text>
                                                 {asset.current_price ? (
                                                     <>Current Price: <strong>Ksh {asset.current_price.toLocaleString()}</strong></>

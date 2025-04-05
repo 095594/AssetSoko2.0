@@ -43,25 +43,42 @@ class CheckAuctionCompletion extends Command
             ->orderBy('amount', 'desc')
             ->first();
 
-        // Update asset status
-        $asset->status = 'completed';
-        $asset->save();
-
         if ($winningBid) {
             // Update all bids for this asset
             Bid::where('asset_id', $asset->id)
-                ->update(['is_winning' => false]);
-
+                ->update(['status' => 'outbid']);
+            
             // Mark the winning bid
-            $winningBid->is_winning = true;
+            $winningBid->status = 'accepted';
             $winningBid->save();
 
+            // Create payment record
+            \App\Models\Payment::create([
+                'asset_id' => $asset->id,
+                'bid_id' => $winningBid->id,
+                'buyer_id' => $winningBid->user_id,
+                'seller_id' => $asset->user_id,
+                'amount' => $winningBid->amount,
+                'payment_method' => 'pending', // Will be set when buyer initiates payment
+                'status' => 'pending'
+            ]);
+
+            // Update asset status
+            $asset->status = 'pending_payment';
+            $asset->save();
+
             // Fire the auction completed event
-            event(new AuctionCompleted($asset, $winningBid));
+            event(new \App\Events\AuctionCompleted($asset, $winningBid->user, $winningBid->amount));
+            
+            // Send notification to winner
+            $winningBid->user->notify(new \App\Notifications\AuctionWonNotification($asset, $winningBid));
+            
+            $this->info("Processed completed auction for asset: {$asset->name} - Winner: {$winningBid->user->name}");
         } else {
             // No bids were placed
             $asset->status = 'expired';
             $asset->save();
+            $this->info("Processed completed auction for asset: {$asset->name} - No bids placed");
         }
     }
 } 

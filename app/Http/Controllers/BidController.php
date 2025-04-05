@@ -146,4 +146,44 @@ class BidController extends Controller
             ], 500);
         }
     }
+
+    public function won()
+    {
+        $user = auth()->user();
+        
+        // Get completed assets where user has won
+        $wonAssets = Asset::where('status', 'completed')
+            ->whereHas('bids', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->with(['bids' => function($query) {
+                $query->orderBy('amount', 'desc');
+            }, 'user'])
+            ->get()
+            ->filter(function ($asset) use ($user) {
+                // Get the highest bid for this asset
+                $highestBid = $asset->bids->first();
+                return $highestBid && $highestBid->user_id === $user->id;
+            })
+            ->map(function ($asset) {
+                return [
+                    'id' => $asset->id,
+                    'name' => $asset->name,
+                    'description' => $asset->description,
+                    'final_price' => $asset->bids->first()->amount,
+                    'auction_end_time' => $asset->auction_end_time,
+                    'seller' => [
+                        'id' => $asset->user->id,
+                        'name' => $asset->user->name,
+                    ],
+                    'total_bids' => $asset->bids->count(),
+                    'your_bids' => $asset->bids->where('user_id', auth()->id())->count(),
+                ];
+            });
+
+        return Inertia::render('Buyer/Bids/Won', [
+            'wonAssets' => $wonAssets,
+            'darkMode' => $user->dark_mode,
+        ]);
+    }
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Head, usePage, Link } from "@inertiajs/react";
+import { Head, usePage, Link, router } from "@inertiajs/react";
 import BuyerLayout from "@/Layouts/BuyerLayout";
 import { Container, Card, Row, Col, Badge, Button, Table, Alert } from "react-bootstrap";
 import { FiClock, FiDollarSign, FiEdit2, FiTrash2, FiPlus } from "react-icons/fi";
@@ -98,10 +98,13 @@ const AssetRow = ({ asset, onDelete }) => {
 
 const AssetList = ({ assets }) => {
     const handleDelete = async (assetId) => {
+        console.log('Attempting to delete asset:', assetId);
         try {
+            console.log('Route:', route('seller.assets.destroy', assetId));
             await router.delete(route('seller.assets.destroy', assetId));
             toast.success('Asset deleted successfully');
         } catch (error) {
+            console.error('Delete error:', error);
             toast.error('Failed to delete asset');
         }
     };

@@ -42,6 +42,11 @@ class AuctionCompleted implements ShouldBroadcast
         ];
     }
 
+    public function broadcastAs()
+    {
+        return 'AuctionCompleted';
+    }
+
     public function broadcastWith()
     {
         return [
@@ -50,7 +55,7 @@ class AuctionCompleted implements ShouldBroadcast
                 'name' => $this->asset->name,
                 'price' => $this->winningBid,
             ],
-            'message' => 'Congratulations! You have won the auction for ' . $this->asset->name . ' with a bid of $' . $this->winningBid . '. Please proceed to payment.',
+            'message' => 'Congratulations! You have won the auction for ' . $this->asset->name . ' with a bid of Ksh ' . number_format($this->winningBid, 2) . '. Please proceed to payment.',
         ];
     }
 } 

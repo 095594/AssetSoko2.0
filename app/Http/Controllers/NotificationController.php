@@ -26,6 +26,12 @@ class NotificationController extends Controller
                     }])
                     ->find($data['asset_id']);
                 $notification->asset = $asset;
+            } else if (isset($data['asset_name'])) {
+                // For notifications that have asset_name but not asset_id
+                $notification->asset = (object)[
+                    'id' => $data['asset_id'] ?? null,
+                    'name' => $data['asset_name'] ?? 'Unknown Asset'
+                ];
             }
 
             // Get bidder information if it's a bid notification
@@ -36,8 +42,29 @@ class NotificationController extends Controller
                     }])
                     ->find($data['bid_id']);
                 $notification->bid = $bid;
+            } else if (isset($data['bid_amount'])) {
+                // For notifications that have bid_amount but not bid_id
+                $notification->bid = (object)[
+                    'id' => $data['bid_id'] ?? null,
+                    'amount' => $data['bid_amount'] ?? 0,
+                    'user' => isset($data['bidder_name']) ? (object)[
+                        'name' => $data['bidder_name'],
+                        'company_name' => $data['bidder_company_name'] ?? null
+                    ] : null
+                ];
+            } else if (isset($data['winning_bid_amount'])) {
+                // For auction won notifications
+                $notification->bid = (object)[
+                    'amount' => $data['winning_bid_amount'] ?? 0
+                ];
             }
 
+            // Ensure message is set
+            if (!isset($data['message']) && isset($data['asset_name'])) {
+                $data['message'] = "Notification about {$data['asset_name']}";
+            }
+            
+            $notification->data = $data;
             return $notification;
         });
 
