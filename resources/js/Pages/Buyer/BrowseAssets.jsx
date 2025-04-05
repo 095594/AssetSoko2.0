@@ -321,21 +321,21 @@ const BrowseAssets = ({ assets, categories = [], darkMode = false, auth = {} }) 
                                 className="rounded-pill"
                             />
                         </Form.Group>
-                    </Col>
-                    <Col md={3}>
-                        <Form.Select
-                            value={selectedCategory}
+                        </Col>
+                        <Col md={3}>
+                            <Form.Select
+                                value={selectedCategory}
                             onChange={handleCategoryChange}
                             className="rounded-pill"
-                        >
-                            <option value="">All Categories</option>
+                            >
+                                <option value="">All Categories</option>
                             {categories.map(category => (
-                                <option key={category} value={category}>
-                                    {category}
-                                </option>
-                            ))}
-                        </Form.Select>
-                    </Col>
+                                    <option key={category} value={category}>
+                                        {category}
+                                    </option>
+                                ))}
+                            </Form.Select>
+                        </Col>
                     <Col md={5}>
                         <Form onSubmit={handlePriceRangeSubmit} className="d-flex gap-2">
                             <Form.Control
@@ -358,21 +358,21 @@ const BrowseAssets = ({ assets, categories = [], darkMode = false, auth = {} }) 
                                 <FiFilter /> Filter
                             </Button>
                         </Form>
-                    </Col>
-                </Row>
+                        </Col>
+                    </Row>
 
-                <Row>
+                    <Row>
                     {assets.data.map(asset => (
-                        <AssetCard
-                            key={asset.id}
-                            asset={asset}
-                            darkMode={darkMode}
-                            toggleWatchlist={toggleWatchlist}
+                            <AssetCard 
+                                key={asset.id} 
+                                asset={asset} 
+                                darkMode={darkMode}
+                                toggleWatchlist={toggleWatchlist}
                             isWatching={watchlist.has(asset.id)}
                             loading={loading}
-                        />
-                    ))}
-                </Row>
+                            />
+                        ))}
+                    </Row>
 
                 {assets.data.length === 0 && (
                     <Alert variant="info" className="text-center">
@@ -380,22 +380,22 @@ const BrowseAssets = ({ assets, categories = [], darkMode = false, auth = {} }) 
                     </Alert>
                 )}
 
-                <div className="d-flex justify-content-center mt-4">
-                    <Pagination>
-                        {assets.links.map((link, index) => (
-                            <Pagination.Item
-                                key={index}
-                                active={link.active}
-                                disabled={!link.url}
+                    <div className="d-flex justify-content-center mt-4">
+                        <Pagination>
+                            {assets.links.map((link, index) => (
+                                <Pagination.Item
+                                    key={index}
+                                    active={link.active}
+                                    disabled={!link.url}
                                 onClick={() => handlePagination(link.url)}
                             >
                                 {link.label === '&laquo; Previous' ? 'Previous' : 
                                  link.label === 'Next &raquo;' ? 'Next' : 
                                  link.label}
-                            </Pagination.Item>
-                        ))}
-                    </Pagination>
-                </div>
+                                </Pagination.Item>
+                            ))}
+                        </Pagination>
+                    </div>
             </Container>
         </BuyerLayout>
     );

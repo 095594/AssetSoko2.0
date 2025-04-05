@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Notifications\AssetNotification;
+use Carbon\Carbon;
 
 class Asset extends Model
 {
@@ -33,6 +34,8 @@ class Asset extends Model
         'current_price' => 'decimal:2',
         'auction_start_time' => 'datetime',
         'auction_end_time' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
         'photos' => 'array'
     ];
 
@@ -91,5 +94,17 @@ class Asset extends Model
         }
 
         return $query;
+    }
+
+    protected function getAuctionEndTimeAttribute($value)
+    {
+        // When retrieving from database (UTC), convert to local time
+        return $value ? Carbon::parse($value)->setTimezone(config('app.timezone')) : null;
+    }
+
+    protected function setAuctionEndTimeAttribute($value)
+    {
+        // When saving to database, convert from local time to UTC
+        $this->attributes['auction_end_time'] = $value ? Carbon::parse($value)->setTimezone('UTC') : null;
     }
 }

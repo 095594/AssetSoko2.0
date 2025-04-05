@@ -18,6 +18,7 @@ import {
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import axios from 'axios';
+import { format } from 'date-fns';
 
 // Register ChartJS components
 ChartJS.register(
@@ -241,7 +242,8 @@ const Dashboard = () => {
         notifications = [], 
         recentAssets = [], 
         auth,
-        bidActivity = [] 
+        bidActivity = [],
+        stats
     } = props;
     
     const [bids, setBids] = useState(activeBids);
@@ -255,6 +257,7 @@ const Dashboard = () => {
         wonBids: 0,
         lostBids: 0
     });
+    const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
         if (auth?.user?.id && window.Echo) {
@@ -304,6 +307,15 @@ const Dashboard = () => {
         fetchBidStats();
     }, []);
 
+    useEffect(() => {
+        // Update time every second
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, []);
+
     const markAsRead = (id) => {
         setNewNotifications(prev => 
             prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n)
@@ -316,6 +328,11 @@ const Dashboard = () => {
             <Head title="Dashboard" />
             <Container className="mt-4">
                 <h3 className="mb-4">Dashboard Overview</h3>
+
+                <div className="mb-4 text-right">
+                    <span className="text-lg font-semibold">Current Time: </span>
+                    <span>{format(currentTime, 'PPpp')}</span>
+                </div>
 
                 {/* Quick Stats */}
                 <Row className="mb-4 g-4">

@@ -7,9 +7,24 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const AssetRow = ({ asset, onDelete }) => {
+    // Debug function to log asset data
+    console.log('Asset data:', {
+        id: asset.id,
+        name: asset.name,
+        photos: asset.photos,
+        photosType: typeof asset.photos,
+        parsedPhotos: typeof asset.photos === 'string' ? JSON.parse(asset.photos) : asset.photos
+    });
+    
     const timeLeft = new Date(asset.auction_end_time) - new Date();
-    const hoursLeft = Math.max(Math.floor(timeLeft / (1000 * 60 * 60)), 0);
-    const isActive = hoursLeft > 0;
+    const secondsLeft = Math.floor((timeLeft / 1000) % 60);
+    const minutesLeft = Math.floor((timeLeft / (1000 * 60)) % 60);
+    const hoursLeft = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
+    const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+
+    const statusDisplay = timeLeft > 0 
+        ? `${daysLeft}d ${hoursLeft}h ${minutesLeft}m ${secondsLeft}s` 
+        : 'Ended';
 
     const handleDelete = () => {
         if (window.confirm('Are you sure you want to delete this asset?')) {
@@ -21,12 +36,28 @@ const AssetRow = ({ asset, onDelete }) => {
         <tr>
             <td>
                 <div className="d-flex align-items-center">
-                    <img 
-                        src={asset.photos ? JSON.parse(asset.photos)[0] : '/images/fallback.jpg'} 
-                        alt={asset.name}
-                        className="rounded me-2"
-                        style={{ width: '50px', height: '50px', objectFit: 'cover' }}
-                    />
+                    {asset.photos ? (
+                        <img 
+                            src={typeof asset.photos === 'string' ? 
+                                `/storage/${JSON.parse(asset.photos)[0].replace('assets\\/', '')}` : 
+                                `/storage/${asset.photos[0].replace('assets\\/', '')}`} 
+                            alt={asset.name}
+                            className="rounded me-2"
+                            style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                            onError={(e) => {
+                                console.error('Image load error:', e.target.src);
+                                e.target.onerror = null;
+                                e.target.src = '/images/fallback.jpg';
+                            }}
+                        />
+                    ) : (
+                        <img 
+                            src="/images/fallback.jpg" 
+                            alt="No image"
+                            className="rounded me-2"
+                            style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                        />
+                    )}
                     <div>
                         <div className="fw-bold">{asset.name}</div>
                         <div className="text-muted small">{asset.category}</div>
@@ -40,8 +71,8 @@ const AssetRow = ({ asset, onDelete }) => {
                 </div>
             </td>
             <td>
-                <Badge bg={isActive ? "success" : "secondary"}>
-                    <FiClock /> {hoursLeft}h left
+                <Badge bg={timeLeft > 0 ? "success" : "secondary"}>
+                    <FiClock /> {statusDisplay}
                 </Badge>
             </td>
             <td>

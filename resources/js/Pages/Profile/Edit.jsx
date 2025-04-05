@@ -1,239 +1,213 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useForm } from "@inertiajs/react";
-import Cropper from "react-easy-crop";
-import { getCroppedImg } from "../../utils/cropImage";
-import { FiUpload } from "react-icons/fi";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import React, { useState } from 'react';
+import { Head, useForm } from '@inertiajs/react';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
+import { FiUser, FiMail, FiPhone, FiMapPin, FiSave } from 'react-icons/fi';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-const ProfileEdit = ({ auth }) => {
-    const user = auth.user;
-
-    const { data, setData, post, processing, errors } = useForm({
-        name: user.name || "",
-        email: user.email || "",
-        theme: user.theme || localStorage.getItem("theme") || "light",
-        current_password: "",
-        password: "",
-        password_confirmation: "",
-        profile_picture: null,
+export default function Edit({ auth, mustVerifyEmail, status }) {
+    const { data, setData, patch, errors, processing } = useForm({
+        name: auth.user.name,
+        email: auth.user.email,
+        phone: auth.user.phone || '',
+        address: auth.user.address || '',
     });
 
-    const [imageSrc, setImageSrc] = useState(null);
-    const [croppedImage, setCroppedImage] = useState(null);
-    const [crop, setCrop] = useState({ x: 0, y: 0 });
-    const [zoom, setZoom] = useState(1);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-    const [showCropper, setShowCropper] = useState(false);
-
-    useEffect(() => {
-        document.body.setAttribute("data-theme", data.theme);
-        localStorage.setItem("theme", data.theme);
-    }, [data.theme]);
-
-    const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => {
-                setImageSrc(reader.result);
-                setShowCropper(true);
-            };
-        }
-    };
-
-    const onCropComplete = useCallback((_, croppedAreaPixels) => {
-        setCroppedAreaPixels(croppedAreaPixels);
-    }, []);
-
-    const applyCrop = async () => {
-        if (imageSrc && croppedAreaPixels) {
-            try {
-                const croppedImageBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
-                const croppedImageUrl = URL.createObjectURL(croppedImageBlob);
-                setCroppedImage(croppedImageUrl);
-                setData("profile_picture", croppedImageBlob);
-                setShowCropper(false);
-            } catch (error) {
-                toast.error("Failed to crop image. Please try again.");
-            }
-        }
-    };
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const submit = (e) => {
         e.preventDefault();
-        post(route("profile.update"), {
-            forceFormData: true,
-            onSuccess: () => toast.success("Profile updated successfully!"),
-            onError: () => toast.error("Failed to update profile."),
+        setIsSubmitting(true);
+        
+        patch(route('profile.update'), {
+            onSuccess: () => {
+                toast.success('Profile updated successfully!');
+                setTimeout(() => {
+                    window.location.href = route('dashboard');
+                }, 1500);
+            },
+            onError: () => {
+                toast.error('Failed to update profile. Please try again.');
+                setIsSubmitting(false);
+            },
         });
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <ToastContainer />
-            <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8">
-                <h2 className="text-2xl font-bold text-center text-gray-900 mb-6">Edit Profile</h2>
+        <AuthenticatedLayout
+            user={auth.user}
+            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">Profile</h2>}
+        >
+            <Head title="Profile" />
 
-                <div className="text-center mb-6">
-                    <label className="block cursor-pointer">
-                        <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                        <div className="relative inline-block">
-                        <img
-                            src={croppedImage || `/storage/${user.profile_picture}`}
-                            alt="Profile"
-                            className="w-24 h-24 rounded-full object-cover shadow-md"
-                        />
+            <div className="py-12">
+                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                        <div className="p-6 text-gray-900 dark:text-gray-100">
+                            <ToastContainer position="top-right" autoClose={3000} />
+                            
+                            {status && (
+                                <Alert variant="success" className="mb-4">
+                                    {status}
+                                </Alert>
+                            )}
 
-                            <div className="absolute bottom-0 right-0 bg-white p-1 rounded-full shadow-sm">
-                                <FiUpload className="text-gray-700" />
-                            </div>
-                        </div>
-                    </label>
-                    {errors.profile_picture && (
-                        <p className="text-sm text-red-600 mt-2">{errors.profile_picture}</p>
-                    )}
+                            <Card className="border-0 shadow-sm">
+                                <Card.Body className="p-4">
+                                    <div className="text-center mb-4">
+                                        <div className="avatar-circle mb-3">
+                                            <span className="initials">
+                                                {auth.user.name.charAt(0).toUpperCase()}
+                                            </span>
                 </div>
-
-                {/* Cropper */}
-                {showCropper && (
-                    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-                        <div className="bg-white p-6 rounded-lg w-11/12 max-w-lg flex flex-col items-center">
-                            <div className="relative w-full h-[300px]">
-                                <Cropper
-                                    image={imageSrc}
-                                    crop={crop}
-                                    zoom={zoom}
-                                    aspect={1}
-                                    onCropChange={setCrop}
-                                    onZoomChange={setZoom}
-                                    onCropComplete={onCropComplete}
-                                />
+                                        <h4 className="mb-0">{auth.user.name}</h4>
+                                        <p className="text-muted">{auth.user.email}</p>
                             </div>
 
-                            {/* Buttons - Fully Visible Below Cropper */}
-                            <div className="flex justify-between gap-4 mt-6 w-full">
-                                <button
-                                    onClick={applyCrop}
-                                    className="w-1/2 bg-green-500 text-white py-2 rounded-md hover:bg-green-600"
-                                >
-                                    Apply
-                                </button>
-                                <button
-                                    onClick={() => setShowCropper(false)}
-                                    className="w-1/2 bg-red-500 text-white py-2 rounded-md hover:bg-red-600"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Form */}
-                <form onSubmit={submit} className="space-y-6">
-                    {/* Name */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Name</label>
-                        <div className="mt-1">
-                            <input
+                                    <Form onSubmit={submit}>
+                                        <Row>
+                                            <Col md={6} className="mb-3">
+                                                <Form.Group>
+                                                    <Form.Label className="d-flex align-items-center">
+                                                        <FiUser className="me-2" /> Name
+                                                    </Form.Label>
+                                                    <Form.Control
                                 type="text"
                                 value={data.name}
-                                onChange={(e) => setData("name", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        onChange={(e) => setData('name', e.target.value)}
+                                                        isInvalid={errors.name}
+                                                        className="form-control-lg"
                             />
                             {errors.name && (
-                                <p className="text-sm text-red-600 mt-1">{errors.name}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                        <div className="mt-1">
-                            <input
+                                                        <Form.Control.Feedback type="invalid">
+                                                            {errors.name}
+                                                        </Form.Control.Feedback>
+                                                    )}
+                                                </Form.Group>
+                                            </Col>
+                                            
+                                            <Col md={6} className="mb-3">
+                                                <Form.Group>
+                                                    <Form.Label className="d-flex align-items-center">
+                                                        <FiMail className="me-2" /> Email
+                                                    </Form.Label>
+                                                    <Form.Control
                                 type="email"
                                 value={data.email}
-                                onChange={(e) => setData("email", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        onChange={(e) => setData('email', e.target.value)}
+                                                        isInvalid={errors.email}
+                                                        className="form-control-lg"
                             />
                             {errors.email && (
-                                <p className="text-sm text-red-600 mt-1">{errors.email}</p>
-                            )}
+                                                        <Form.Control.Feedback type="invalid">
+                                                            {errors.email}
+                                                        </Form.Control.Feedback>
+                                                    )}
+                                                </Form.Group>
+                                            </Col>
+                                            
+                                            <Col md={6} className="mb-3">
+                                                <Form.Group>
+                                                    <Form.Label className="d-flex align-items-center">
+                                                        <FiPhone className="me-2" /> Phone
+                                                    </Form.Label>
+                                                    <Form.Control
+                                                        type="text"
+                                                        value={data.phone}
+                                                        onChange={(e) => setData('phone', e.target.value)}
+                                                        isInvalid={errors.phone}
+                                                        className="form-control-lg"
+                                                    />
+                                                    {errors.phone && (
+                                                        <Form.Control.Feedback type="invalid">
+                                                            {errors.phone}
+                                                        </Form.Control.Feedback>
+                                                    )}
+                                                </Form.Group>
+                                            </Col>
+                                            
+                                            <Col md={6} className="mb-3">
+                                                <Form.Group>
+                                                    <Form.Label className="d-flex align-items-center">
+                                                        <FiMapPin className="me-2" /> Address
+                                                    </Form.Label>
+                                                    <Form.Control
+                                                        type="text"
+                                                        value={data.address}
+                                                        onChange={(e) => setData('address', e.target.value)}
+                                                        isInvalid={errors.address}
+                                                        className="form-control-lg"
+                                                    />
+                                                    {errors.address && (
+                                                        <Form.Control.Feedback type="invalid">
+                                                            {errors.address}
+                                                        </Form.Control.Feedback>
+                                                    )}
+                                                </Form.Group>
+                                            </Col>
+                                        </Row>
+                                        
+                                        <div className="d-grid gap-2 mt-4">
+                                            <Button 
+                                                variant="primary" 
+                                                type="submit" 
+                                                size="lg"
+                                                disabled={processing || isSubmitting}
+                                                className="d-flex align-items-center justify-content-center"
+                                            >
+                                                <FiSave className="me-2" />
+                                                {processing || isSubmitting ? 'Saving...' : 'Save Changes'}
+                                            </Button>
+                                </div>
+                                    </Form>
+                                </Card.Body>
+                            </Card>
                         </div>
                     </div>
-
-                    {/* Theme Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Select Theme</label>
-                        <div className="mt-1">
-                            <select
-                                value={data.theme}
-                                onChange={(e) => setData("theme", e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="light">Light</option>
-                                <option value="dark">Dark</option>
-                            </select>
-                        </div>
                     </div>
-
-                    {/* Password Update Section */}
-                    <div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Change Password</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Current Password</label>
-                                <div className="mt-1">
-                                    <input
-                                        type="password"
-                                        value={data.current_password}
-                                        onChange={(e) => setData("current_password", e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">New Password</label>
-                                <div className="mt-1">
-                                    <input
-                                        type="password"
-                                        value={data.password}
-                                        onChange={(e) => setData("password", e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
-                                <div className="mt-1">
-                                    <input
-                                        type="password"
-                                        value={data.password_confirmation}
-                                        onChange={(e) => setData("password_confirmation", e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Submit Button */}
-                    <div>
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            {processing ? "Saving..." : "Save Changes"}
-                        </button>
-                    </div>
-                </form>
             </div>
-        </div>
+            
+            <style jsx>{`
+                .avatar-circle {
+                    width: 100px;
+                    height: 100px;
+                    background-color: #4e73df;
+                    border-radius: 50%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    margin: 0 auto;
+                }
+                
+                .initials {
+                    font-size: 40px;
+                    color: white;
+                    font-weight: bold;
+                }
+                
+                .form-control-lg {
+                    height: 50px;
+                    font-size: 16px;
+                    border-radius: 8px;
+                }
+                
+                .btn-primary {
+                    background-color: #4e73df;
+                    border-color: #4e73df;
+                    border-radius: 8px;
+                    padding: 12px;
+                }
+                
+                .btn-primary:hover {
+                    background-color: #2e59d9;
+                    border-color: #2e59d9;
+                }
+                
+                .card {
+                    border-radius: 12px;
+                }
+            `}</style>
+        </AuthenticatedLayout>
     );
-};
-
-export default ProfileEdit;
+}

@@ -29,7 +29,7 @@ const Notifications = ({ notifications, darkMode }) => {
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <h2>Notifications</h2>
                     <div className="d-flex gap-2">
-                        <Button
+                        <Button 
                             variant="primary"
                             onClick={() => window.location.href = route('notifications.markAllAsRead')}
                         >
@@ -59,12 +59,12 @@ const Notifications = ({ notifications, darkMode }) => {
                                         <td>{notification.data.message}</td>
                                         <td>
                                             {notification.asset ? (
-                                                <Link 
+                            <Link 
                                                     href={route('buyer.assets.show', notification.asset.id)}
                                                     className={darkMode ? "text-light" : ""}
-                                                >
+                            >
                                                     {notification.asset.name}
-                                                </Link>
+                            </Link>
                                             ) : (
                                                 <span className="text-muted">N/A</span>
                                             )}
@@ -107,8 +107,8 @@ const Notifications = ({ notifications, darkMode }) => {
                                 ))}
                             </tbody>
                         </Table>
-                    </Card.Body>
-                </Card>
+                        </Card.Body>
+                    </Card>
             </Container>
         </BuyerLayout>
     );

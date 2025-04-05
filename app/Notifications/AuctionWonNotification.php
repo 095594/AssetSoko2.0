@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Asset;
+use App\Models\Bid;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -18,7 +19,7 @@ class AuctionWonNotification extends Notification implements ShouldQueue
     /**
      * Create a new notification instance.
      */
-    public function __construct(Asset $asset, $winningBid)
+    public function __construct(Asset $asset, Bid $winningBid)
     {
         $this->asset = $asset;
         $this->winningBid = $winningBid;
@@ -29,23 +30,32 @@ class AuctionWonNotification extends Notification implements ShouldQueue
      *
      * @return array<int, string>
      */
-    public function via(object $notifiable): array
+    public function via($notifiable)
     {
-        return ['mail'];
+        return ['mail', 'database'];
     }
 
     /**
      * Get the mail representation of the notification.
      */
-    public function toMail(object $notifiable): MailMessage
+    public function toMail($notifiable)
     {
         return (new MailMessage)
-            ->subject('Congratulations! You Won the Auction')
-            ->greeting('Hello ' . $notifiable->name . '!')
+            ->subject('Congratulations! You won the auction')
             ->line('Congratulations! You have won the auction for ' . $this->asset->name)
-            ->line('Your winning bid: $' . $this->winningBid)
-            ->action('Proceed to Payment', route('payments.initiate', $this->asset))
-            ->line('Please complete your payment within 24 hours to secure your purchase.')
-            ->line('Thank you for using our platform!');
+            ->line('Your winning bid: $' . number_format($this->winningBid->amount, 2))
+            ->action('View Asset', route('assets.show', $this->asset))
+            ->line('Please proceed with the payment to complete your purchase.');
+    }
+
+    public function toArray($notifiable)
+    {
+        return [
+            'asset_id' => $this->asset->id,
+            'asset_name' => $this->asset->name,
+            'winning_bid_amount' => $this->winningBid->amount,
+            'message' => 'Congratulations! You have won the auction for ' . $this->asset->name,
+            'type' => 'auction_won'
+        ];
     }
 } 

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Asset;
 use App\Models\Bid;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -14,6 +15,61 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
         
+        // Get active bids (bids on assets that are still active)
+        $activeBids = Bid::where('user_id', $user->id)
+            ->whereHas('asset', function ($query) {
+                $query->where('status', 'active')
+                    ->where('auction_end_time', '>', now());
+            })
+            ->with(['asset' => function ($query) {
+                $query->select('id', 'name', 'current_price', 'auction_end_time');
+            }])
+            ->get();
+
+        // Calculate bid statistics
+        $totalBids = Bid::where('user_id', $user->id)->count();
+
+        $activeBidsCount = Bid::where('user_id', $user->id)
+            ->whereHas('asset', function ($query) {
+                $query->where('status', 'active')
+                    ->where('auction_end_time', '>', now());
+            })
+            ->count();
+
+        // Get completed assets where user has bid
+        $completedAssets = Asset::where('status', 'completed')
+            ->whereHas('bids', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->get();
+
+        // Calculate won and lost bids
+        $wonBids = 0;
+        $lostBids = 0;
+
+        foreach ($completedAssets as $asset) {
+            // Get the highest bid for this asset
+            $highestBid = Bid::where('asset_id', $asset->id)
+                ->orderBy('amount', 'desc')
+                ->first();
+            
+            if ($highestBid && $highestBid->user_id === $user->id) {
+                $wonBids++;
+            } else {
+                $lostBids++;
+            }
+        }
+
+        // Get recommended assets
+        $recommendedAssets = Asset::where('status', 'active')
+            ->where('auction_end_time', '>', now())
+            ->whereDoesntHave('bids', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->latest()
+            ->take(5)
+            ->get();
+
         // Get user's watchlist with related data
         $watchlist = Asset::whereIn('id', function($query) use ($user) {
             $query->select('asset_id')
@@ -22,15 +78,6 @@ class DashboardController extends Controller
         })
         ->with(['user', 'bids'])
         ->get();
-
-        // Get user's active bids
-        $activeBids = Bid::where('user_id', $user->id)
-            ->with(['asset'])
-            ->whereHas('asset', function($query) {
-                $query->where('auction_end_time', '>', now());
-            })
-            ->latest()
-            ->get();
 
         // Get recent assets
         $recentAssets = Asset::with(['user'])
@@ -67,6 +114,13 @@ class DashboardController extends Controller
             'notifications' => $notifications,
             'recentAssets' => $recentAssets,
             'bidActivity' => $bidActivity,
+            'recommendedAssets' => $recommendedAssets,
+            'bidStats' => [
+                'totalBids' => $totalBids,
+                'activeBids' => $activeBidsCount,
+                'wonBids' => $wonBids,
+                'lostBids' => $lostBids
+            ],
             'darkMode' => $user->dark_mode ?? false,
         ]);
     }

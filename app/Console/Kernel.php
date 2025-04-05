@@ -7,6 +7,10 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
+    protected $commands = [
+        Commands\CheckAuctionCompletion::class,
+    ];
+
     /**
      * Define the application's command schedule.
      *
@@ -18,7 +22,9 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // Check for completed auctions every minute
-        $schedule->command('auctions:check-completion')->everyMinute();
+        $schedule->command('auctions:check-completion')
+            ->everyMinute()
+            ->withoutOverlapping();
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Asset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Log;
 
 class BidController extends Controller
 {
@@ -78,38 +79,71 @@ class BidController extends Controller
 
     public function stats()
     {
-        $user = auth()->user();
-        
-        $totalBids = $user->bids()->count();
-        
-        $activeBids = $user->bids()
-            ->whereHas('asset', function($query) {
-                $query->where('auction_end_time', '>', now())
-                      ->where('status', 'active');
-            })
-            ->count();
-        
-        $wonBids = $user->bids()
-            ->whereHas('asset', function($query) {
-                $query->where('auction_end_time', '<', now())
-                      ->where('status', 'completed');
-            })
-            ->where('is_winning', true)
-            ->count();
-        
-        $lostBids = $user->bids()
-            ->whereHas('asset', function($query) {
-                $query->where('auction_end_time', '<', now())
-                      ->where('status', 'completed');
-            })
-            ->where('is_winning', false)
-            ->count();
+        try {
+            $user = auth()->user();
+            
+            $totalBids = $user->bids()->count();
+            
+            $activeBids = $user->bids()
+                ->whereHas('asset', function($query) {
+                    $query->where('auction_end_time', '>', now())
+                          ->where('status', 'active');
+                })
+                ->count();
+            
+            // Get completed assets where user has bid
+            $completedAssets = Asset::where('status', 'completed')
+                ->whereHas('bids', function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                })
+                ->with(['bids' => function($query) {
+                    $query->orderBy('amount', 'desc');
+                }])
+                ->get();
 
-        return response()->json([
-            'totalBids' => $totalBids,
-            'activeBids' => $activeBids,
-            'wonBids' => $wonBids,
-            'lostBids' => $lostBids
-        ]);
+            // Calculate won and lost bids
+            $wonBids = 0;
+            $lostBids = 0;
+
+            foreach ($completedAssets as $asset) {
+                // Get the highest bid for this asset
+                $highestBid = $asset->bids->first();
+                
+                if ($highestBid && $highestBid->user_id === $user->id) {
+                    $wonBids++;
+                }
+                
+                // Count all bids by this user on this asset that weren't the highest
+                $userBidsOnAsset = $asset->bids->where('user_id', $user->id);
+                $lostBids += $userBidsOnAsset->count() - ($highestBid && $highestBid->user_id === $user->id ? 1 : 0);
+            }
+
+            // Log the bid stats for debugging
+            Log::info('Bid stats calculated', [
+                'user_id' => $user->id,
+                'totalBids' => $totalBids,
+                'activeBids' => $activeBids,
+                'wonBids' => $wonBids,
+                'lostBids' => $lostBids,
+                'completedAssets' => $completedAssets->count()
+            ]);
+
+            return response()->json([
+                'totalBids' => $totalBids,
+                'activeBids' => $activeBids,
+                'wonBids' => $wonBids,
+                'lostBids' => $lostBids
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error calculating bid stats', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'error' => 'Error calculating bid stats',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }
