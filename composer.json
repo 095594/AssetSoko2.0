@@ -9,6 +9,7 @@
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.0",
         "inertiajs/inertia-laravel": "^2.0",
+        "laravel/cashier": "^15.6",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
@@ -19,6 +20,7 @@
         "phpoffice/phpspreadsheet": "^4.1",
         "predis/predis": "^2.3",
         "pusher/pusher-php-server": "^7.2",
+        "stripe/stripe-php": "^16.6",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {
@@ -36,7 +38,10 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "classmap": [
+            "app/Console/Commands"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

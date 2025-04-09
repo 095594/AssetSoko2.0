@@ -8,13 +8,32 @@ use Inertia\Inertia;
 use App\Models\Asset;
 use App\Models\Bid;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Buyer\AIRecommendationController;
 
 class DashboardController extends Controller
 {
+    protected $aiController;
+
+    public function __construct(AIRecommendationController $aiController)
+    {
+        $this->aiController = $aiController;
+    }
+
     public function index()
     {
         $user = auth()->user();
         
+        // Get AI recommendations
+        $aiRecommendations = [];
+        try {
+            $response = $this->aiController->getRecommendations();
+            if ($response->getStatusCode() === 200) {
+                $aiRecommendations = $response->getData();
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error getting recommendations: ' . $e->getMessage());
+        }
+
         // Get active bids (bids on assets that are still active)
         $activeBids = Bid::where('user_id', $user->id)
             ->whereHas('asset', function ($query) {
@@ -114,6 +133,7 @@ class DashboardController extends Controller
             'notifications' => $notifications,
             'recentAssets' => $recentAssets,
             'bidActivity' => $bidActivity,
+            'aiRecommendations' => $aiRecommendations,
             'recommendedAssets' => $recommendedAssets,
             'bidStats' => [
                 'totalBids' => $totalBids,

@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AuthenticatedLayout from '@/Layouts/BuyerLayout';
 import { Link } from '@inertiajs/react';
 import { formatCurrency } from '@/utils/format';
 

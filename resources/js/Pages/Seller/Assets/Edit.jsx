@@ -8,7 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { format } from 'date-fns';
 
 const EditAsset = ({ asset }) => {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, put, processing, errors, reset } = useForm({
         name: asset.name || '',
         description: asset.description || '',
         category: asset.category || '',
@@ -36,12 +36,20 @@ const EditAsset = ({ asset }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('seller.assets.update', asset.id), {
+        
+        // Format the auction end time to include timezone
+        const formattedData = {
+            ...data,
+            auction_end_time: data.auction_end_time ? new Date(data.auction_end_time).toISOString() : null
+        };
+
+        put(route('seller.assets.update', asset.id), formattedData, {
             onSuccess: () => {
                 toast.success('Asset updated successfully');
             },
-            onError: () => {
+            onError: (errors) => {
                 toast.error('Failed to update asset');
+                console.error('Form errors:', errors);
             }
         });
     };

@@ -13,7 +13,9 @@ const AssetRow = ({ asset, onDelete }) => {
         name: asset.name,
         photos: asset.photos,
         photosType: typeof asset.photos,
-        parsedPhotos: typeof asset.photos === 'string' ? JSON.parse(asset.photos) : asset.photos
+        parsedPhotos: typeof asset.photos === 'string' ? JSON.parse(asset.photos) : asset.photos,
+        auction_end_time: asset.auction_end_time,
+        current_time: new Date().toISOString()
     });
     
     const timeLeft = new Date(asset.auction_end_time) - new Date();

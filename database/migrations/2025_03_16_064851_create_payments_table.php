@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
+class CreatePaymentsTable extends Migration
 {
     public function up()
     {
@@ -15,11 +15,9 @@ return new class extends Migration
             $table->foreignId('buyer_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('seller_id')->constrained('users')->onDelete('cascade');
             $table->decimal('amount', 10, 2);
-            $table->string('payment_method');
-            $table->string('status')->default('pending'); // pending, processing, completed, failed
-            $table->string('transaction_id')->nullable();
+            $table->string('payment_method')->nullable();
+            $table->string('status')->default('pending');
             $table->json('payment_details')->nullable();
-            $table->timestamp('paid_at')->nullable();
             $table->timestamps();
         });
     }
@@ -28,4 +26,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('payments');
     }
-}; 
+} 

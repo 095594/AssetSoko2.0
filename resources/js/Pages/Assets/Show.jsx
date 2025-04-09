@@ -1,15 +1,29 @@
 // Resources/js/Pages/Assets/Show.jsx
-import { useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
-import BuyerLayout from '@/Layouts/BuyerLayout';
+import React, { useState, useEffect } from 'react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
+import AuthenticatedLayout from '@/Layouts/BuyerLayout';
+import { Container, Row, Col, Card, Button, Badge, ListGroup, ProgressBar, Modal } from 'react-bootstrap';
+import { 
+    FiClock, 
+    FiEye, 
+    FiArrowLeft, 
+    FiDollarSign, 
+    FiTrendingUp,
+    FiAlertCircle,
+    FiCalendar,
+    FiAward,
+    FiArrowRight,
+    FiBell,
+    FiHeart
+} from 'react-icons/fi';
+import PrimaryButton from '@/Components/PrimaryButton';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
 import InputError from '@/Components/InputError';
-import PrimaryButton from '@/Components/PrimaryButton';
 import { format } from 'date-fns';
-import React from 'react';
 import axios from 'axios';
-import { toast } from 'react-hot-toast';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { EyeIcon, EyeSlashIcon, ClockIcon, TagIcon, CurrencyDollarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { Dialog } from '@headlessui/react';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
@@ -46,12 +60,59 @@ export default function Show({ auth, asset }) {
         return asset.base_price || 0;
     }, [asset.bids, asset.base_price]);
 
+    const timeLeft = new Date(asset.auction_end_time) - new Date();
+    const hoursLeft = Math.max(Math.floor(timeLeft / (1000 * 60 * 60)), 0);
+    const canBid = auth.user && auth.user.id !== asset.user_id && timeLeft > 0;
+    const isOwner = auth.user && auth.user.id === asset.user_id;
+
+    // Calculate current price based on bids and reserve price
+    const currentPrice = React.useMemo(() => {
+        if (!asset.bids || asset.bids.length === 0) {
+            return asset.base_price || 0;
+        }
+        const highestBid = Math.max(...asset.bids.map(bid => bid.amount));
+        return Math.max(highestBid, asset.base_price || 0);
+    }, [asset.bids, asset.base_price]);
+
+    // Format time display
+    const formatTimeDisplay = () => {
+        if (timeLeft <= 0) {
+            return `Ended ${format(new Date(asset.auction_end_time), 'MMM d, yyyy h:mm a')}`;
+        }
+
+        const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+        if (days > 0) {
+            return `${days}d ${hours}h left`;
+        } else if (hours > 0) {
+            return `${hours}h ${minutes}m left`;
+        } else {
+            return `${minutes}m ${seconds}s left`;
+        }
+    };
+
+    // Update time display every second
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const newTimeLeft = new Date(asset.auction_end_time) - new Date();
+            if (newTimeLeft <= 0) {
+                clearInterval(timer);
+            }
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [asset.auction_end_time]);
+
+    // Handle bid submission
     const handleBid = (e) => {
         e.preventDefault();
         const bidAmount = parseFloat(data.amount);
         
-        if (bidAmount < minBid) {
-            toast.error(`Your bid must be at least Ksh ${minBid.toLocaleString()} (${minBid === asset.base_price ? 'starting price' : 'current highest bid'})`);
+        if (bidAmount < currentPrice) {
+            toast.error(`Your bid must be higher than the current price of Ksh ${currentPrice.toLocaleString()}`);
             return;
         }
 
@@ -72,9 +133,9 @@ export default function Show({ auth, asset }) {
     const toggleWatchlist = async () => {
         setIsToggling(true);
         try {
-            const response = await axios.post(route('buyer.watchlist.toggle', asset.id));
-            setIsWatching(response.data.isWatching);
-            toast.success(response.data.isWatching ? 'Added to watchlist' : 'Removed from watchlist');
+            await router.post(route('buyer.watchlist.toggle', asset.id));
+            setIsWatching(!isWatching);
+            toast.success(!isWatching ? 'Added to watchlist' : 'Removed from watchlist');
         } catch (error) {
             console.error('Error toggling watchlist:', error);
             toast.error('Failed to update watchlist');
@@ -83,22 +144,8 @@ export default function Show({ auth, asset }) {
         }
     };
 
-    const timeLeft = new Date(asset.auction_end_time) - new Date();
-    const hoursLeft = Math.max(Math.floor(timeLeft / (1000 * 60 * 60)), 0);
-    const canBid = auth.user && auth.user.id !== asset.user_id && hoursLeft > 0;
-    const isOwner = auth.user && auth.user.id === asset.user_id;
-
-    // Calculate current price based on bids and reserve price
-    const currentPrice = React.useMemo(() => {
-        if (!asset.bids || asset.bids.length === 0) {
-            return asset.base_price || 0;
-        }
-        const highestBid = Math.max(...asset.bids.map(bid => bid.amount));
-        return Math.max(highestBid, asset.base_price || 0);
-    }, [asset.bids, asset.base_price]);
-
     return (
-        <BuyerLayout>
+        <AuthenticatedLayout>
             <Head title={asset.name} />
 
             {/* Bid Success Modal */}
@@ -294,7 +341,7 @@ export default function Show({ auth, asset }) {
                                             <span className={`text-xl font-bold ${
                                                 hoursLeft < 24 ? 'text-red-600' : 'text-green-600'
                                             }`}>
-                                                {hoursLeft} hours
+                                                {formatTimeDisplay()}
                                             </span>
                                 </div>
                                     </motion.div>
@@ -310,61 +357,61 @@ export default function Show({ auth, asset }) {
                                         >
                                             <h2 className="text-xl font-semibold mb-4">Place Your Bid</h2>
                                             <div className="space-y-4">
-                                            <div>
-                                                <InputLabel htmlFor="amount" value="Your Bid Amount" />
-                                                <div className="mt-1 relative rounded-lg shadow-sm">
-                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                        <span className="text-gray-500 sm:text-sm">Ksh</span>
+                                                <div>
+                                                    <InputLabel htmlFor="amount" value="Your Bid Amount" />
+                                                    <div className="mt-1 relative rounded-lg shadow-sm">
+                                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                            <span className="text-gray-500 sm:text-sm">Ksh</span>
+                                                        </div>
+                                                        <TextInput
+                                                            id="amount"
+                                                            type="number"
+                                                            name="amount"
+                                                            value={data.amount}
+                                                            className="pl-12 block w-full rounded-lg"
+                                                            min={currentPrice}
+                                                            step="0.01"
+                                                            onChange={(e) => setData('amount', e.target.value)}
+                                                            required
+                                                        />
                                                     </div>
-                                                    <TextInput
-                                                        id="amount"
-                                                        type="number"
-                                                        name="amount"
-                                                        value={data.amount}
-                                                        className="pl-12 block w-full rounded-lg"
-                                                        min={currentPrice || asset.base_price || 0}
-                                                        step="0.01"
-                                                        onChange={(e) => setData('amount', e.target.value)}
-                                                        required
-                                                    />
+                                                    <p className="mt-2 text-sm text-gray-500">
+                                                        Minimum bid: Ksh {currentPrice.toLocaleString()}
+                                                    </p>
+                                                    <InputError message={errors.amount} className="mt-2" />
                                                 </div>
-                                                <p className="mt-2 text-sm text-gray-500">
-                                                    Minimum bid: Ksh {(currentPrice || asset.base_price || 0).toLocaleString()}
-                                                </p>
-                                                <InputError message={errors.amount} className="mt-2" />
-                                            </div>
 
-                                            <PrimaryButton 
-                                                disabled={processing}
+                                                <PrimaryButton 
+                                                    disabled={processing}
                                                     className="w-full py-3 text-lg"
-                                            >
-                                                {processing ? (
-                                                    <span className="inline-flex items-center">
+                                                >
+                                                    {processing ? (
+                                                        <span className="inline-flex items-center">
                                                             <span className="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
-                                                        Placing Bid...
-                                                    </span>
-                                                ) : (
-                                                    'Place Bid'
-                                                )}
-                                            </PrimaryButton>
+                                                            Placing Bid...
+                                                        </span>
+                                                    ) : (
+                                                        'Place Bid'
+                                                    )}
+                                                </PrimaryButton>
                                             </div>
                                         </motion.form>
                                     )}
 
                                     {/* Bid History */}
-                                    {asset.bids && asset.bids.length > 0 && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.3 }}
-                                            className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
-                                        >
-                                            <div className="flex items-center space-x-2 mb-4">
-                                                <UserGroupIcon className="h-5 w-5 text-gray-500" />
-                                                <h2 className="text-xl font-semibold">Bid History</h2>
-                                    </div>
-                                    <div className="space-y-3">
-                                                {asset.bids.map((bid, index) => (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.3 }}
+                                        className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
+                                    >
+                                        <div className="flex items-center space-x-2 mb-4">
+                                            <UserGroupIcon className="h-5 w-5 text-gray-500" />
+                                            <h2 className="text-xl font-semibold">Bid History</h2>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {asset.bids && asset.bids.length > 0 ? (
+                                                asset.bids.map((bid, index) => (
                                                     <motion.div
                                                         key={index}
                                                         initial={{ opacity: 0, x: -20 }}
@@ -375,25 +422,29 @@ export default function Show({ auth, asset }) {
                                                         <div>
                                                             <span className="font-medium text-gray-900">
                                                                 {bid.user?.company_name || bid.user?.name || 'Anonymous Bidder'}
-                                                                </span>
+                                                            </span>
                                                             <span className="text-sm text-gray-500 ml-2">
                                                                 {format(new Date(bid.created_at), 'MMM d, yyyy h:mm a')}
-                                                                    </span>
+                                                            </span>
                                                         </div>
                                                         <span className="font-semibold text-blue-600">
                                                             Ksh {bid.amount.toLocaleString()}
                                                         </span>
                                                     </motion.div>
-                                                ))}
-                                                        </div>
-                                        </motion.div>
-                                                        )}
+                                                ))
+                                            ) : (
+                                                <div className="text-center py-4 text-gray-500">
+                                                    No bids yet. Be the first to bid!
+                                                </div>
+                                            )}
+                                        </div>
+                                    </motion.div>
                                                     </div>
                                                 </div>
                         </div>
                     </motion.div>
                 </div>
             </div>
-        </BuyerLayout>
+        </AuthenticatedLayout>
     );
 }

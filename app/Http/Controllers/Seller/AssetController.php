@@ -51,6 +51,7 @@ class AssetController extends Controller
         $asset->user_id = auth()->id();
         $asset->status = 'active';
         $asset->current_price = $validated['base_price'];
+        $asset->auction_start_time = now();
 
         if ($request->hasFile('photos')) {
             $photos = [];

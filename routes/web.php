@@ -24,6 +24,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\Admin\AdminSettingsController;
+use App\Http\Controllers\Buyer\AIRecommendationController;
 
 // Broadcasting Routes
 Broadcast::routes(['middleware' => ['web', 'auth']]);
@@ -63,6 +64,16 @@ Route::middleware(['auth'])->group(function () {
         ->name('notifications.markAsRead');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
 
+    // Payment routes
+    Route::get('/payments/{asset}', [PaymentController::class, 'showPaymentForm'])->name('payments.create');
+    Route::post('/payments/stripe/{asset}', [PaymentController::class, 'processStripePayment'])->name('payments.stripe');
+    Route::post('/payments/mpesa/{asset}', [PaymentController::class, 'processMpesaPayment'])->name('payments.mpesa');
+    Route::get('/payments/success/{asset}', [PaymentController::class, 'paymentSuccess'])->name('payments.success');
+    Route::get('/payments/status/{asset}', [PaymentController::class, 'showPaymentStatus'])->name('payments.status');
+
+    // M-Pesa callback route (should be public)
+    Route::post('/payments/mpesa/callback', [PaymentController::class, 'mpesaCallback'])->name('payments.mpesa.callback');
+
     // General Dashboard (Redirect Based on Role)
     Route::get('/dashboard', function () {
         $user = auth()->user();
@@ -88,10 +99,6 @@ Route::middleware(['auth'])->group(function () {
     // Bid Routes
     Route::post('bids/place', [BidController::class, 'store'])->name('bids.store');
     Route::get('bids', [BidController::class, 'index'])->name('bids.index');
-
-    // Payment routes
-    Route::post('/payments/{asset}/initiate', [PaymentController::class, 'initiatePayment'])->name('payments.initiate');
-    Route::get('/payments/{asset}/status', [PaymentController::class, 'showPaymentStatus'])->name('payments.status');
 
     // Bid statistics route
     Route::get('/buyer/bids/stats', [BidController::class, 'stats'])->name('buyer.bids.stats');
@@ -121,15 +128,20 @@ Route::put('/profile/theme', [ProfileController::class, 'updateTheme'])
     ->name('profile.theme.update');
     
 // Buyer Routes
-Route::middleware(['auth'])->prefix('buyer')->group(function () {
-    Route::get('/dashboard', [BuyerDashboardController::class, 'index'])->name('buyer.dashboard');
-    Route::get('/assets', [AssetController::class, 'browse'])->name('buyer.assets.index');
-    Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('buyer.assets.show');
-    Route::post('/assets/{asset}/bid', [BidController::class, 'store'])->name('buyer.bids.store');
-    Route::get('/bids', [BidController::class, 'index'])->name('buyer.bids.index');
-    Route::get('/bids/won', [BidController::class, 'won'])->name('buyer.bids.won');
-    Route::get('/watchlist', [WatchlistController::class, 'index'])->name('buyer.watchlist');
-    Route::post('/watchlist/{asset}/toggle', [WatchlistController::class, 'toggle'])->name('buyer.watchlist.toggle');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::prefix('buyer')->name('buyer.')->group(function () {
+        Route::get('/dashboard', [BuyerDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/recommendations', [AIRecommendationController::class, 'getRecommendations'])->name('recommendations');
+        Route::get('/assets', [AssetController::class, 'browse'])->name('assets.index');
+        Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
+        Route::post('/assets/{asset}/bid', [BidController::class, 'store'])->name('bids.store');
+        Route::get('/bids', [BidController::class, 'index'])->name('bids.index');
+        Route::get('/bids/won', [BidController::class, 'won'])->name('bids.won');
+        Route::get('/watchlist', [WatchlistController::class, 'index'])->name('watchlist');
+        Route::post('/watchlist/{asset}/toggle', [WatchlistController::class, 'toggle'])->name('watchlist.toggle');
+        Route::post('/payments/initiate/{asset}', [PaymentController::class, 'initiatePayment'])->name('payments.initiate');
+        Route::get('/payments/status/{asset}', [PaymentController::class, 'showPaymentStatus'])->name('payments.status');
+    });
 });
 
 // Seller Routes
@@ -148,9 +160,6 @@ Route::middleware(['auth'])->prefix('seller')->group(function () {
     Route::get('/bids', [SellerBidController::class, 'index'])->name('seller.bids.index');
     Route::get('/bids/{bid}', [SellerBidController::class, 'show'])->name('seller.bids.show');
 });
-
-// M-Pesa callback route (no auth required)
-Route::post('/payments/mpesa/callback', [PaymentController::class, 'mpesaCallback'])->name('payments.mpesa.callback');
 
 Route::get('/test-pusher', function () {
     event(new App\Events\TestEvent('Hello from Pusher!'));

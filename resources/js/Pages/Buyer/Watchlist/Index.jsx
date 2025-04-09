@@ -12,20 +12,20 @@ const WatchlistCard = ({ asset }) => {
         try {
             if (asset.photos) {
                 if (Array.isArray(asset.photos)) {
-                    return asset.photos[0];
+                    return `/storage/${asset.photos[0]}`;
                 }
                 
                 const parsed = JSON.parse(asset.photos);
                 if (Array.isArray(parsed)) {
-                    return parsed[0];
+                    return `/storage/${parsed[0]}`;
                 }
             }
             if (typeof asset.photos === 'string' && asset.photos.trim().startsWith('assets/')) {
-                return asset.photos;
+                return `/storage/${asset.photos}`;
             }
-            return asset.image_url;
+            return asset.image_url ? `/storage/${asset.image_url}` : '/images/placeholder.jpg';
         } catch (e) {
-            return asset.image_url;
+            return '/images/placeholder.jpg';
         }
     };
 
@@ -37,6 +37,10 @@ const WatchlistCard = ({ asset }) => {
                     src={getFirstImage()}
                     alt={asset.name}
                     style={{ height: "200px", objectFit: "cover" }}
+                    onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = '/images/placeholder.jpg';
+                    }}
                 />
                 <Card.Body className="d-flex flex-column">
                     <Card.Title className="mb-2">{asset.name}</Card.Title>

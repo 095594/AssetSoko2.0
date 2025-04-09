@@ -31,16 +31,15 @@ class WatchlistController extends Controller
         $isWatching = $asset->isWatchedBy(auth()->user());
 
         if ($isWatching) {
-            $asset->watchlist()->where('user_id', auth()->id())->delete();
+            $asset->watchlist()->detach(auth()->id());
         } else {
-            $asset->watchlist()->create([
-                'user_id' => auth()->id()
-            ]);
+            $asset->watchlist()->attach(auth()->id());
         }
 
-        return response()->json([
-            'isWatching' => !$isWatching
-        ]);
+        // Broadcast the watchlist update event
+        broadcast(new WatchlistUpdated(auth()->id(), $asset->id, !$isWatching))->toOthers();
+
+        return back()->with('success', $isWatching ? 'Asset removed from watchlist' : 'Asset added to watchlist');
     }
 }
 

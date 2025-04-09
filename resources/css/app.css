@@ -259,3 +259,57 @@
 .sidebar.collapsed .sidebar-header .btn-link {
     margin: 0;
 }
+
+/* AI Recommendations Styles */
+.ai-recommendation-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.ai-recommendation-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.ai-recommendation-card .card-img-top {
+    border-radius: 8px 8px 0 0;
+}
+
+.ai-recommendation-card .badge {
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 20px;
+}
+
+.ai-recommendation-card .card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.ai-recommendation-card .btn-primary {
+    background: linear-gradient(45deg, #4f46e5, #7c3aed);
+    border: none;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.ai-recommendation-card .btn-primary:hover {
+    background: linear-gradient(45deg, #4338ca, #6d28d9);
+    transform: translateY(-2px);
+}
+
+/* Dark mode styles */
+.dark-mode .ai-recommendation-card {
+    background-color: #1a1a1a;
+    border-color: #333;
+}
+
+.dark-mode .ai-recommendation-card .card-title,
+.dark-mode .ai-recommendation-card .text-muted {
+    color: #fff;
+}
+
+.dark-mode .ai-recommendation-card:hover {
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}

@@ -22,14 +22,22 @@ const CreateAsset = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('seller.assets.store'), {
+        
+        // Format the auction end time to include timezone
+        const formattedData = {
+            ...data,
+            auction_end_time: data.auction_end_time ? new Date(data.auction_end_time).toISOString() : null
+        };
+
+        post(route('seller.assets.store'), formattedData, {
             onSuccess: () => {
                 toast.success('Asset listed successfully');
                 reset();
                 setPreviewImages([]);
             },
-            onError: () => {
+            onError: (errors) => {
                 toast.error('Failed to list asset');
+                console.error('Form errors:', errors);
             }
         });
     };

@@ -13,6 +13,8 @@ class AuctionWonNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public $queue = 'notifications';
+
     protected $asset;
     protected $winningBid;
 

@@ -2,18 +2,20 @@
 
 namespace App\Services;
 
-use App\Models\Payment;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Models\Payment;
+use Carbon\Carbon;
 
 class MpesaService
 {
-    private $consumerKey;
-    private $consumerSecret;
-    private $passkey;
-    private $shortcode;
-    private $callbackUrl;
-    private $baseUrl;
+    protected $consumerKey;
+    protected $consumerSecret;
+    protected $passkey;
+    protected $shortcode;
+    protected $environment;
+    protected $baseUrl;
+    protected $callbackUrl;
 
     public function __construct()
     {
@@ -21,118 +23,12 @@ class MpesaService
         $this->consumerSecret = config('services.mpesa.consumer_secret');
         $this->passkey = config('services.mpesa.passkey');
         $this->shortcode = config('services.mpesa.shortcode');
-        $this->callbackUrl = config('services.mpesa.callback_url');
+        $this->environment = config('services.mpesa.environment');
         $this->baseUrl = config('services.mpesa.base_url');
+        $this->callbackUrl = config('services.mpesa.callback_url');
     }
 
-    public function initiatePayment(Payment $payment)
-    {
-        try {
-            // Get access token
-            $token = $this->getAccessToken();
-            if (!$token) {
-                throw new \Exception('Failed to get access token');
-            }
-
-            // Generate timestamp
-            $timestamp = date('YmdHis');
-            
-            // Generate password
-            $password = base64_encode($this->shortcode . $this->passkey . $timestamp);
-
-            // Prepare request data
-            $data = [
-                'BusinessShortCode' => $this->shortcode,
-                'Password' => $password,
-                'Timestamp' => $timestamp,
-                'TransactionType' => 'CustomerPayBillOnline',
-                'Amount' => (int) $payment->amount,
-                'PartyA' => $payment->buyer->phone,
-                'PartyB' => $this->shortcode,
-                'PhoneNumber' => $payment->buyer->phone,
-                'CallBackURL' => $this->callbackUrl,
-                'AccountReference' => 'ASSET' . $payment->asset_id,
-                'TransactionDesc' => 'Payment for ' . $payment->asset->name
-            ];
-
-            // Make API request
-            $response = Http::withToken($token)
-                ->post($this->baseUrl . '/mpesa/stkpush/v1/processrequest', $data);
-
-            if ($response->successful()) {
-                $result = $response->json();
-                
-                // Update payment with checkout request ID
-                $payment->update([
-                    'payment_details' => [
-                        'checkout_request_id' => $result['CheckoutRequestID'],
-                        'merchant_request_id' => $result['MerchantRequestID']
-                    ]
-                ]);
-
-                return [
-                    'success' => true,
-                    'checkout_request_id' => $result['CheckoutRequestID'],
-                    'merchant_request_id' => $result['MerchantRequestID']
-                ];
-            }
-
-            throw new \Exception('Failed to initiate M-Pesa payment: ' . $response->body());
-
-        } catch (\Exception $e) {
-            Log::error('M-Pesa payment initiation failed: ' . $e->getMessage());
-            $payment->markAsFailed(['error' => $e->getMessage()]);
-            
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
-        }
-    }
-
-    public function handleCallback($data)
-    {
-        try {
-            // Verify the callback data
-            if (!$this->verifyCallback($data)) {
-                throw new \Exception('Invalid callback data');
-            }
-
-            // Find the payment by checkout request ID
-            $payment = Payment::where('payment_details->checkout_request_id', $data['CheckoutRequestID'])
-                ->first();
-
-            if (!$payment) {
-                throw new \Exception('Payment not found');
-            }
-
-            // Update payment status based on result code
-            if ($data['ResultCode'] === 0) {
-                $payment->markAsCompleted($data['MpesaReceiptNumber'], [
-                    'result_code' => $data['ResultCode'],
-                    'result_desc' => $data['ResultDesc'],
-                    'amount' => $data['Amount'],
-                    'transaction_date' => $data['TransactionDate']
-                ]);
-
-                // Update asset status
-                $payment->asset->update(['status' => 'sold']);
-            } else {
-                $payment->markAsFailed([
-                    'result_code' => $data['ResultCode'],
-                    'result_desc' => $data['ResultDesc']
-                ]);
-            }
-
-            return true;
-
-        } catch (\Exception $e) {
-            Log::error('M-Pesa callback handling failed: ' . $e->getMessage());
-            return false;
-        }
-    }
-
-    private function getAccessToken()
+    public function getAccessToken()
     {
         try {
             $response = Http::withBasicAuth($this->consumerKey, $this->consumerSecret)
@@ -142,18 +38,139 @@ class MpesaService
                 return $response->json()['access_token'];
             }
 
+            Log::error('M-Pesa Access Token Error: ' . $response->body());
             return null;
-
         } catch (\Exception $e) {
-            Log::error('Failed to get M-Pesa access token: ' . $e->getMessage());
+            Log::error('M-Pesa Access Token Exception: ' . $e->getMessage());
             return null;
         }
     }
 
-    private function verifyCallback($data)
+    public function initiatePayment(Payment $payment)
     {
-        // Add your callback verification logic here
-        // This should verify that the callback is actually from M-Pesa
-        return true;
+        $accessToken = $this->getAccessToken();
+        if (!$accessToken) {
+            return [
+                'success' => false,
+                'message' => 'Failed to get access token'
+            ];
+        }
+
+        $timestamp = date('YmdHis');
+        $password = base64_encode($this->shortcode . $this->passkey . $timestamp);
+
+        try {
+            $response = Http::withToken($accessToken)
+                ->post($this->baseUrl . '/mpesa/stkpush/v1/processrequest', [
+                    'BusinessShortCode' => $this->shortcode,
+                    'Password' => $password,
+                    'Timestamp' => $timestamp,
+                    'TransactionType' => 'CustomerPayBillOnline',
+                    'Amount' => $payment->amount,
+                    'PartyA' => $payment->buyer->phone_number,
+                    'PartyB' => $this->shortcode,
+                    'PhoneNumber' => $payment->buyer->phone_number,
+                    'CallBackURL' => $this->callbackUrl,
+                    'AccountReference' => 'AssetSoko-' . $payment->id,
+                    'TransactionDesc' => 'Payment for Asset: ' . $payment->asset->name
+                ]);
+
+            if ($response->successful()) {
+                $result = $response->json();
+                if ($result['ResponseCode'] == '0') {
+                    $payment->update([
+                        'payment_details' => json_encode([
+                            'merchant_request_id' => $result['MerchantRequestID'],
+                            'checkout_request_id' => $result['CheckoutRequestID'],
+                            'response_code' => $result['ResponseCode'],
+                            'response_description' => $result['ResponseDescription']
+                        ])
+                    ]);
+
+                    return [
+                        'success' => true,
+                        'message' => 'Payment initiated successfully'
+                    ];
+                }
+            }
+
+            Log::error('M-Pesa Payment Initiation Error: ' . $response->body());
+            return [
+                'success' => false,
+                'message' => 'Failed to initiate payment'
+            ];
+        } catch (\Exception $e) {
+            Log::error('M-Pesa Payment Initiation Exception: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'An error occurred while initiating payment'
+            ];
+        }
+    }
+
+    public function handleCallback($data)
+    {
+        try {
+            $result = $data['Body']['stkCallback'];
+            $merchantRequestID = $result['MerchantRequestID'];
+            $checkoutRequestID = $result['CheckoutRequestID'];
+            $resultCode = $result['ResultCode'];
+            $resultDesc = $result['ResultDesc'];
+
+            // Find the payment record
+            $payment = Payment::where('payment_details->merchant_request_id', $merchantRequestID)
+                ->where('payment_details->checkout_request_id', $checkoutRequestID)
+                ->first();
+
+            if (!$payment) {
+                Log::error('M-Pesa Callback: Payment record not found');
+                return false;
+            }
+
+            if ($resultCode == 0) {
+                // Payment successful
+                $payment->update([
+                    'status' => 'completed',
+                    'payment_method' => 'mpesa',
+                    'payment_details' => array_merge(
+                        json_decode($payment->payment_details, true),
+                        [
+                            'result_code' => $resultCode,
+                            'result_desc' => $resultDesc,
+                            'callback_data' => $result
+                        ]
+                    )
+                ]);
+
+                // Notify the seller
+                $payment->seller->notify(new \App\Notifications\PaymentReceived($payment));
+                
+                // Notify the buyer
+                $payment->buyer->notify(new \App\Notifications\PaymentSuccessful($payment));
+
+                return true;
+            } else {
+                // Payment failed
+                $payment->update([
+                    'status' => 'failed',
+                    'payment_details' => array_merge(
+                        json_decode($payment->payment_details, true),
+                        [
+                            'result_code' => $resultCode,
+                            'result_desc' => $resultDesc,
+                            'callback_data' => $result
+                        ]
+                    )
+                ]);
+
+                // Notify the buyer
+                $payment->buyer->notify(new \App\Notifications\PaymentFailed($payment));
+
+                return false;
+            }
+        } catch (\Exception $e) {
+            Log::error('M-Pesa Callback Exception: ' . $e->getMessage());
+            return false;
+        }
     }
 } 

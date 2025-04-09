@@ -51,7 +51,8 @@ class Asset extends Model
 
     public function watchlist()
     {
-        return $this->hasMany(Watchlist::class);
+        return $this->belongsToMany(User::class, 'watchlists')
+            ->withTimestamps();
     }
 
     public function isWatchedBy(User $user): bool
@@ -98,13 +99,27 @@ class Asset extends Model
 
     protected function getAuctionEndTimeAttribute($value)
     {
-        // When retrieving from database (UTC), convert to local time
-        return $value ? Carbon::parse($value)->setTimezone(config('app.timezone')) : null;
+        if (!$value) return null;
+        return Carbon::parse($value)->setTimezone(config('app.timezone'));
     }
 
     protected function setAuctionEndTimeAttribute($value)
     {
-        // When saving to database, convert from local time to UTC
-        $this->attributes['auction_end_time'] = $value ? Carbon::parse($value)->setTimezone('UTC') : null;
+        if (!$value) {
+            $this->attributes['auction_end_time'] = null;
+            return;
+        }
+        
+        // Parse the input time in UTC (since that's what we receive from the frontend)
+        $utcTime = Carbon::parse($value, 'UTC');
+        
+        // Store in UTC
+        $this->attributes['auction_end_time'] = $utcTime;
+    }
+
+    // Alias for user relationship
+    public function seller()
+    {
+        return $this->user();
     }
 }

@@ -4,6 +4,7 @@ import { Link, router } from "@inertiajs/react";
 import BuyerLayout from "@/Layouts/BuyerLayout";
 import { FiHeart, FiClock, FiUser, FiDollarSign, FiInfo, FiCalendar } from "react-icons/fi";
 import axios from "axios";
+import { format } from "date-fns";
 
 const AssetShow = ({ asset, darkMode, auth }) => {
     const [bidAmount, setBidAmount] = useState("");
@@ -13,6 +14,41 @@ const AssetShow = ({ asset, darkMode, auth }) => {
     const [loading, setLoading] = useState(false);
     const [watchlistLoading, setWatchlistLoading] = useState(false);
     const [photos, setPhotos] = useState([]);
+    const [timeLeft, setTimeLeft] = useState(new Date(asset.auction_end_time) - new Date());
+
+    // Update time left every second
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const newTimeLeft = new Date(asset.auction_end_time) - new Date();
+            setTimeLeft(newTimeLeft);
+            
+            if (newTimeLeft <= 0) {
+                clearInterval(timer);
+            }
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [asset.auction_end_time]);
+
+    // Calculate time left display
+    const calculateTimeLeft = () => {
+        const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+        if (timeLeft <= 0) {
+            return `Ended ${format(new Date(asset.auction_end_time), 'MMM d, yyyy h:mm a')}`;
+        }
+
+        if (days > 0) {
+            return `${days}d ${hours}h left`;
+        } else if (hours > 0) {
+            return `${hours}h ${minutes}m left`;
+        } else {
+            return `${minutes}m ${seconds}s left`;
+        }
+    };
 
     // Parse and set photos
     useEffect(() => {
@@ -32,14 +68,6 @@ const AssetShow = ({ asset, darkMode, auth }) => {
             setPhotos([]);
         }
     }, [asset.photos]);
-
-    // Calculate time left
-    const calculateTimeLeft = () => {
-        const timeLeft = new Date(asset.auction_end_time) - new Date();
-        const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        return `${days}d ${hours}h`;
-    };
 
     const handleBidSubmit = async (e) => {
         e.preventDefault();
@@ -148,7 +176,7 @@ const AssetShow = ({ asset, darkMode, auth }) => {
 
                                 <div className="mb-4">
                                     <Badge bg="info" className="me-2">
-                                        <FiClock /> {calculateTimeLeft()} left
+                                        <FiClock /> {calculateTimeLeft()}
                                     </Badge>
                                     <Badge bg={asset.status === 'active' ? 'success' : 'danger'}>
                                         {asset.status.toUpperCase()}
@@ -271,7 +299,7 @@ const AssetShow = ({ asset, darkMode, auth }) => {
 
                                 <div className="mb-4">
                                     <Badge bg="info" className="me-2">
-                                        <FiClock /> {calculateTimeLeft()} left
+                                        <FiClock /> {calculateTimeLeft()}
                                     </Badge>
                                     <Badge bg={asset.status === 'active' ? 'success' : 'danger'}>
                                         {asset.status.toUpperCase()}

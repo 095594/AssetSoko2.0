@@ -25,7 +25,7 @@ class WatchlistUpdated implements ShouldBroadcast
         $this->userId = $userId;
         $this->assetId = $assetId;
         $this->isWatching = $isWatching;
-        $this->asset = Asset::with(['seller', 'bids'])->find($assetId);
+        $this->asset = Asset::with(['user', 'bids'])->find($assetId);
     }
 
     public function broadcastOn()

@@ -44,6 +44,15 @@ class AppServiceProvider extends ServiceProvider
         // Broadcast::extend('socket.io', function ($app) {
         //     return new SocketIoBroadcaster;
         // });
+
+        // Register commands
+        $this->commands([
+            \App\Console\Commands\CheckAuctionCompletion::class,
+            \App\Console\Commands\FixAuctionTimes::class,
+            \App\Console\Commands\TestQueue::class,
+            \App\Console\Commands\NotifyEndingAuctions::class,
+            \App\Console\Commands\CleanupNotifications::class,
+        ]);
     }
     
 }

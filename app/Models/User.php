@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -61,9 +62,9 @@ class User extends Authenticatable
     }
 
     // Relationship with watchlist (for buyers)
-    public function watchlist(): HasMany
+    public function watchlist(): BelongsToMany
     {
-        return $this->belongsToMany(Asset::class, 'watchlist')
+        return $this->belongsToMany(Asset::class, 'watchlists')
             ->withTimestamps();
     }
 

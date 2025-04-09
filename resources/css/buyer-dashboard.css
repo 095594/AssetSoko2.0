@@ -1,0 +1,109 @@
+.nav-tabs-custom {
+    display: flex;
+    border-bottom: 1px solid #e3e6f0;
+    margin-bottom: 1rem;
+}
+
+.nav-tab {
+    padding: 0.75rem 1.25rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #6c757d;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nav-tab:hover {
+    color: #4e73df;
+}
+
+.nav-tab.active {
+    color: #4e73df;
+    border-bottom-color: #4e73df;
+}
+
+.stat-card {
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.stat-icon svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+.bg-primary {
+    background-color: #4e73df;
+}
+
+.bg-success {
+    background-color: #1cc88a;
+}
+
+.bg-warning {
+    background-color: #f6c23e;
+}
+
+.bg-info {
+    background-color: #36b9cc;
+}
+
+.notification-item {
+    transition: background-color 0.2s;
+}
+
+.notification-item:hover {
+    background-color: rgba(78, 115, 223, 0.05);
+}
+
+.notification-message {
+    font-weight: 500;
+}
+
+.notification-badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.watchlist-item {
+    transition: background-color 0.2s;
+}
+
+.watchlist-item:hover {
+    background-color: rgba(78, 115, 223, 0.05);
+}
+
+.watchlist-item-content {
+    flex: 1;
+}
+
+.asset-name {
+    font-weight: 500;
+    color: #4e73df;
+}
+
+.asset-name:hover {
+    color: #2e59d9;
+}
+
+.watchlist-item-status {
+    margin-left: 1rem;
+} 

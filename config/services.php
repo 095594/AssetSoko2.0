@@ -40,8 +40,13 @@ return [
         'consumer_secret' => env('MPESA_CONSUMER_SECRET'),
         'passkey' => env('MPESA_PASSKEY'),
         'shortcode' => env('MPESA_SHORTCODE'),
-        'callback_url' => env('MPESA_CALLBACK_URL'),
+        'environment' => env('MPESA_ENVIRONMENT', 'sandbox'),
         'base_url' => env('MPESA_BASE_URL', 'https://sandbox.safaricom.co.ke'),
+    ],
+
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
     ],
 
 ];

@@ -106,7 +106,7 @@ const Watchlist = ({ watchlist, darkMode }) => {
                                             </div>
                                             <div className="d-flex justify-content-between align-items-center">
                                                 <small className={`${darkMode ? "text-light" : "text-muted"}`}>
-                                                    Seller: {asset.seller?.name || 'Unknown'}
+                                                    Seller: {asset.user?.name || 'Unknown'}
                                                 </small>
                                                 <Link 
                                                     href={route('buyer.assets.show', asset.id)}
