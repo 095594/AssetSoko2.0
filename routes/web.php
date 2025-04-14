@@ -39,12 +39,28 @@ Route::get('/', function () {
     ]);
 });
 
-// Public Assets Routes (must come before authenticated routes)
+// Add route pattern for asset parameter
+Route::pattern('asset', '[0-9]+');
+
+// Static files route (must come before asset routes)
+Route::get('/assets/{file}', function ($file) {
+    return response()->file(public_path('assets/' . $file));
+})->where('file', '.*\.(css|js|map|jpg|jpeg|png|gif|ico|svg)$');
+
+// Public Assets Routes
 Route::get('/assets', [AssetController::class, 'publicIndex'])->name('assets.index');
 Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
 
 // Authentication Routes
 require __DIR__.'/auth.php';
+
+// Test Routes
+Route::get('/test-pusher', [\App\Http\Controllers\TestPusherController::class, 'testConnection']);
+Route::get('/test-notification', function() {
+    $user = \App\Models\User::first();
+    $user->notify(new \App\Notifications\TestNotification());
+    return 'Test notification sent to ' . $user->email;
+});
 
 // Common Routes for Authenticated Users
 Route::middleware(['auth'])->group(function () {

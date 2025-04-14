@@ -27,6 +27,7 @@ const getFallbackImage = (category) => {
 const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loading }) => {
     const [timeLeft, setTimeLeft] = useState(new Date(asset.auction_end_time) - new Date());
     const [currentPrice, setCurrentPrice] = useState(asset.current_price || asset.base_price);
+    const [bidCount, setBidCount] = useState(asset.bids_count || 0);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -47,6 +48,7 @@ const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loadi
             .listen('bid.placed', (e) => {
                 if (e.bid.asset_id === asset.id) {
                     setCurrentPrice(e.bid.amount);
+                    setBidCount(prev => prev + 1);
                     toast.success(`New bid placed: ${formatPrice(e.bid.amount)}`);
                 }
             });
@@ -143,7 +145,7 @@ const AssetCard = ({ asset, darkMode = false, toggleWatchlist, isWatching, loadi
                             <FiClock /> {timeLeft <= 0 ? "Ended" : `${hoursLeft}h ${minutesLeft}m left`}
                         </Badge>
                         <Badge bg="secondary">
-                            {asset.bid_count} bids
+                            {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
                         </Badge>
                         <Badge bg="warning" className="ms-2">
                             {asset.category}

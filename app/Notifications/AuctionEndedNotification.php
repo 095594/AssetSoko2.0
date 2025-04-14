@@ -14,12 +14,10 @@ class AuctionEndedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public $queue = 'notifications';
-
     protected $asset;
     protected $winningBid;
 
-    public function __construct(Asset $asset, Bid $winningBid)
+    public function __construct(Asset $asset, ?Bid $winningBid)
     {
         $this->asset = $asset;
         $this->winningBid = $winningBid;
@@ -27,40 +25,47 @@ class AuctionEndedNotification extends Notification implements ShouldQueue
 
     public function via($notifiable)
     {
-        return ['mail', 'database'];
+        return ['mail', 'database', 'broadcast'];
     }
 
     public function toMail($notifiable)
     {
-        return (new MailMessage)
-            ->subject('Your Auction Has Ended')
-            ->line("Your auction for {$this->asset->name} has ended.")
-            ->line("Winning Bid: KES " . number_format($this->winningBid->amount, 2))
-            ->line("Winning Bidder: {$this->winningBid->user->name}")
-            ->action('View Asset', route('assets.show', $this->asset->id))
-            ->line('Thank you for using our platform!');
+        $message = (new MailMessage)
+            ->subject('Auction Ended: ' . $this->asset->name);
+
+        if ($this->winningBid) {
+            $message->markdown('emails.auction-ended', [
+                'asset' => $this->asset,
+                'winningBid' => $this->winningBid,
+                'user' => $notifiable
+            ]);
+        } else {
+            $message->markdown('emails.auction-ended-no-bids', [
+                'asset' => $this->asset,
+                'user' => $notifiable
+            ]);
+        }
+
+        return $message;
     }
 
     public function toArray($notifiable)
     {
-        Log::info('Preparing AuctionEndedNotification database record', [
-            'user_id' => $notifiable->id,
-            'asset_id' => $this->asset->id,
-            'bid_id' => $this->winningBid->id
-        ]);
+        if ($this->winningBid) {
+            return [
+                'asset_id' => $this->asset->id,
+                'asset_name' => $this->asset->name,
+                'winning_bid_amount' => $this->winningBid->amount,
+                'message' => "Your auction for {$this->asset->name} has ended. Winning bid: KES {$this->winningBid->amount}",
+                'type' => 'auction_ended'
+            ];
+        }
 
-        $data = [
+        return [
             'asset_id' => $this->asset->id,
             'asset_name' => $this->asset->name,
-            'winning_bid' => $this->winningBid->amount,
-            'message' => "The auction for {$this->asset->name} has ended. The winning bid was KES " . number_format($this->winningBid->amount, 2) . ".",
-            'type' => 'auction_ended'
+            'message' => "Your auction for {$this->asset->name} has ended with no winning bids",
+            'type' => 'auction_ended_no_bids'
         ];
-
-        Log::info('AuctionEndedNotification data prepared', [
-            'notification_data' => $data
-        ]);
-
-        return $data;
     }
 } 

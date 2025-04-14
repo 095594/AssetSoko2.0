@@ -13,8 +13,6 @@ class AuctionWonNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public $queue = 'notifications';
-
     protected $asset;
     protected $winningBid;
 
@@ -25,6 +23,7 @@ class AuctionWonNotification extends Notification implements ShouldQueue
     {
         $this->asset = $asset;
         $this->winningBid = $winningBid;
+        $this->onQueue('notifications');
     }
 
     /**
@@ -42,12 +41,15 @@ class AuctionWonNotification extends Notification implements ShouldQueue
      */
     public function toMail($notifiable)
     {
+        $this->winningBid->payment_url = url("/payments/{$this->asset->id}");
+        
         return (new MailMessage)
-            ->subject('Congratulations! You won the auction')
-            ->line('Congratulations! You have won the auction for ' . $this->asset->name)
-            ->line('Your winning bid: $' . number_format($this->winningBid->amount, 2))
-            ->action('View Asset', route('assets.show', $this->asset))
-            ->line('Please proceed with the payment to complete your purchase.');
+            ->subject('Congratulations! You Won the Auction: ' . $this->asset->name)
+            ->markdown('emails.auction-won', [
+                'user' => $notifiable,
+                'asset' => $this->asset,
+                'winningBid' => $this->winningBid
+            ]);
     }
 
     public function toArray($notifiable)
@@ -60,4 +62,4 @@ class AuctionWonNotification extends Notification implements ShouldQueue
             'type' => 'auction_won'
         ];
     }
-} 
+}

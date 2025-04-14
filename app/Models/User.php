@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Carbon\Carbon;
 
 class User extends Authenticatable
 {
@@ -110,9 +111,17 @@ class User extends Authenticatable
         return $this->status === 'active';
     }
 
-    // Update last active timestamp
-    public function updateLastActive()
+    // Update user's last active timestamp
+    public function updateLastActive(): void
     {
-        $this->update(['last_active' => now()]);
+        \Log::info('Updating last_active for user ' . $this->id . ' to ' . now());
+        $this->last_active = now();
+        $this->save();
+        \Log::info('Updated last_active for user ' . $this->id . ' to ' . $this->last_active);
+    }
+
+    public function getLastActiveAttribute($value)
+    {
+        return $value ? Carbon::parse($value) : null;
     }
 }

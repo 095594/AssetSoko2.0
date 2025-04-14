@@ -9,12 +9,18 @@ use Illuminate\Support\Facades\Event;
 use App\Events\BidPlaced;
 use App\Events\WatchlistUpdated;
 use App\Events\AuctionCompleted;
+use App\Events\AuctionEndedBroadcast;
 use App\Listeners\HandleBidPlaced;
 use App\Listeners\HandleWatchlistUpdated;
 use App\Listeners\HandleAuctionCompleted;
 
 class EventServiceProvider extends ServiceProvider
 {
+    /**
+     * The event to listener mappings for the application.
+     *
+     * @var array<class-string, array<int, class-string>>
+     */
     protected $listen = [
         Registered::class => [
             SendEmailVerificationNotification::class,
@@ -28,10 +34,22 @@ class EventServiceProvider extends ServiceProvider
         AuctionCompleted::class => [
             HandleAuctionCompleted::class,
         ],
+        AuctionEndedBroadcast::class => [],
     ];
 
-    public function boot()
+    /**
+     * Register any events for your application.
+     */
+    public function boot(): void
     {
         parent::boot();
     }
-} 
+
+    /**
+     * Determine if events and listeners should be automatically discovered.
+     */
+    public function shouldDiscoverEvents(): bool
+    {
+        return false;
+    }
+}

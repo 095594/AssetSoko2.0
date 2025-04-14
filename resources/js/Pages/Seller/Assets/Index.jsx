@@ -7,17 +7,6 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const AssetRow = ({ asset, onDelete }) => {
-    // Debug function to log asset data
-    console.log('Asset data:', {
-        id: asset.id,
-        name: asset.name,
-        photos: asset.photos,
-        photosType: typeof asset.photos,
-        parsedPhotos: typeof asset.photos === 'string' ? JSON.parse(asset.photos) : asset.photos,
-        auction_end_time: asset.auction_end_time,
-        current_time: new Date().toISOString()
-    });
-    
     const timeLeft = new Date(asset.auction_end_time) - new Date();
     const secondsLeft = Math.floor((timeLeft / 1000) % 60);
     const minutesLeft = Math.floor((timeLeft / (1000 * 60)) % 60);
@@ -28,9 +17,27 @@ const AssetRow = ({ asset, onDelete }) => {
         ? `${daysLeft}d ${hoursLeft}h ${minutesLeft}m ${secondsLeft}s` 
         : 'Ended';
 
-    const handleDelete = () => {
+    const handleDelete = (e) => {
+        e.preventDefault();
         if (window.confirm('Are you sure you want to delete this asset?')) {
             onDelete(asset.id);
+        }
+    };
+
+    const getImageUrl = () => {
+        try {
+            if (!asset.photos) return '/images/fallback.jpg';
+            
+            const photos = typeof asset.photos === 'string' ? 
+                JSON.parse(asset.photos) : 
+                asset.photos;
+            
+            return photos && photos.length > 0 ? 
+                `/storage/${photos[0].replace('assets\\/', '')}` : 
+                '/images/fallback.jpg';
+        } catch (error) {
+            console.error('Error parsing photos:', error);
+            return '/images/fallback.jpg';
         }
     };
 
@@ -38,28 +45,17 @@ const AssetRow = ({ asset, onDelete }) => {
         <tr>
             <td>
                 <div className="d-flex align-items-center">
-                    {asset.photos ? (
-                        <img 
-                            src={typeof asset.photos === 'string' ? 
-                                `/storage/${JSON.parse(asset.photos)[0].replace('assets\\/', '')}` : 
-                                `/storage/${asset.photos[0].replace('assets\\/', '')}`} 
-                            alt={asset.name}
-                            className="rounded me-2"
-                            style={{ width: '50px', height: '50px', objectFit: 'cover' }}
-                            onError={(e) => {
-                                console.error('Image load error:', e.target.src);
-                                e.target.onerror = null;
-                                e.target.src = '/images/fallback.jpg';
-                            }}
-                        />
-                    ) : (
-                        <img 
-                            src="/images/fallback.jpg" 
-                            alt="No image"
-                            className="rounded me-2"
-                            style={{ width: '50px', height: '50px', objectFit: 'cover' }}
-                        />
-                    )}
+                    <img 
+                        src={getImageUrl()}
+                        alt={asset.name}
+                        className="rounded me-2"
+                        style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                        onError={(e) => {
+                            console.error('Image load error:', e.target.src);
+                            e.target.onerror = null;
+                            e.target.src = '/images/fallback.jpg';
+                        }}
+                    />
                     <div>
                         <div className="fw-bold">{asset.name}</div>
                         <div className="text-muted small">{asset.category}</div>
@@ -100,9 +96,7 @@ const AssetRow = ({ asset, onDelete }) => {
 
 const AssetList = ({ assets }) => {
     const handleDelete = async (assetId) => {
-        console.log('Attempting to delete asset:', assetId);
         try {
-            console.log('Route:', route('seller.assets.destroy', assetId));
             await router.delete(route('seller.assets.destroy', assetId));
             toast.success('Asset deleted successfully');
         } catch (error) {
@@ -187,11 +181,18 @@ const AssetList = ({ assets }) => {
                                                     key={index}
                                                     className={`page-item ${link.active ? 'active' : ''} ${!link.url ? 'disabled' : ''}`}
                                                 >
-                                                    <Link 
-                                                        href={link.url}
-                                                        className="page-link"
-                                                        dangerouslySetInnerHTML={{ __html: link.label }}
-                                                    />
+                                                    {link.url ? (
+                                                        <Link 
+                                                            href={link.url}
+                                                            className="page-link"
+                                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                                        />
+                                                    ) : (
+                                                        <span 
+                                                            className="page-link"
+                                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                                        />
+                                                    )}
                                                 </li>
                                             ))}
                                         </ul>

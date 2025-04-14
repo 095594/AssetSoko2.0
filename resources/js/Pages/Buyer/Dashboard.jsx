@@ -230,12 +230,20 @@ const BidStatusChart = ({ bids }) => {
         labels: [],
         datasets: [
             {
-                label: 'Bid Amount',
+                label: 'Your Bid',
                 data: [],
                 borderColor: 'rgb(78, 115, 223)',
                 backgroundColor: 'rgba(78, 115, 223, 0.1)',
                 tension: 0.3,
                 fill: true
+            },
+            {
+                label: 'Highest Bid',
+                data: [],
+                borderColor: 'rgb(28, 200, 138)',
+                backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                tension: 0.3,
+                fill: false
             }
         ]
     });
@@ -245,21 +253,30 @@ const BidStatusChart = ({ bids }) => {
             const sortedBids = [...bids].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
             
             const labels = sortedBids.map(bid => 
-                format(new Date(bid.created_at), 'MMM d')
+                format(new Date(bid.created_at), 'MMM d, h:mm a')
             );
             
-            const data = sortedBids.map(bid => bid.amount);
+            const yourBids = sortedBids.map(bid => bid.amount);
+            const highestBids = sortedBids.map(bid => bid.highest_bid || bid.amount);
 
             setChartData({
                 labels,
                 datasets: [
                     {
-                        label: 'Bid Amount',
-                        data,
+                        label: 'Your Bid',
+                        data: yourBids,
                         borderColor: 'rgb(78, 115, 223)',
                         backgroundColor: 'rgba(78, 115, 223, 0.1)',
                         tension: 0.3,
                         fill: true
+                    },
+                    {
+                        label: 'Highest Bid',
+                        data: highestBids,
+                        borderColor: 'rgb(28, 200, 138)',
+                        backgroundColor: 'rgba(28, 200, 138, 0.1)',
+                        tension: 0.3,
+                        fill: false
                     }
                 ]
             });
@@ -488,13 +505,15 @@ const Dashboard = () => {
         recentAssets = [], 
         auth,
         bidActivity = [],
-        stats
+        stats,
+        wonAuctions = []
     } = props;
     
     const [bids, setBids] = useState(activeBids);
     const [newNotifications, setNewNotifications] = useState(notifications);
     const [unreadCount, setUnreadCount] = useState(notifications.filter(n => !n.read_at).length);
     const [watchlist, setWatchlist] = useState(initialWatchlist);
+    const [wonAuctionsList, setWonAuctionsList] = useState(wonAuctions);
     const [loading, setLoading] = useState(false);
     const [bidStats, setBidStats] = useState({
         totalBids: 0,
@@ -510,32 +529,77 @@ const Dashboard = () => {
 
     useEffect(() => {
         if (auth?.user?.id && window.Echo) {
-            const echo = window.Echo;
-            echo.private(`private-user.${auth.user.id}`)
-                .listen('BidUpdated', (data) => {
-                    setBids(prev => prev.map(bid => 
-                        bid.id === data.id ? { ...bid, ...data } : bid
-                    ));
-                })
-                .listen('AuctionEnded', (data) => {
+            console.log('Setting up Pusher listeners for user:', auth.user.id);
+            
+            // Set up private channel for user-specific events
+            const privateChannel = window.Echo.private(`private-user.${auth.user.id}`);
+            
+            // Set up public channel for general auction events
+            const publicChannel = window.Echo.channel('auctions');
+            
+            // Listen for bid updates
+            privateChannel.listen('BidUpdated', (data) => {
+                console.log('Bid updated event received:', data);
+                setBids(prev => prev.map(bid => 
+                    bid.id === data.id ? { ...bid, ...data } : bid
+                ));
+            });
+            
+            // Listen for auction end events
+            publicChannel.listen('AuctionEnded', (data) => {
+                console.log('Auction ended event received:', data);
+                const isWinner = data.winning_bid?.user_id === auth.user.id;
+                const message = isWinner 
+                    ? `Congratulations! You won the auction for ${data.asset.name} with a bid of KES ${data.winning_bid.amount}`
+                    : `Auction for ${data.asset.name} ended. ${data.winning_bid ? `Winning bid: KES ${data.winning_bid.amount}` : 'No winning bids'}`;
+                
+                setNewNotifications(prev => [{
+                    id: Date.now(),
+                    message: message,
+                    read_at: null,
+                    created_at: new Date().toISOString()
+                }, ...prev]);
+                setUnreadCount(prev => prev + 1);
+
+                // Update won auctions if user won
+                if (isWinner) {
+                    setWonAuctionsList(prev => [...prev, data.asset]);
+                }
+            });
+            
+            // Listen for watchlist updates
+            privateChannel.listen('WatchlistUpdated', (data) => {
+                console.log('Watchlist updated event received:', data);
+                if (data.isWatching) {
+                    setWatchlist(prev => [...prev, data.asset]);
+                } else {
+                    setWatchlist(prev => prev.filter(item => item.id !== data.assetId));
+                }
+            });
+            
+            // Listen for auction completion events
+            privateChannel.listen('AuctionCompleted', (data) => {
+                console.log('Auction completed event received:', data);
+                if (data.show_popup) {
                     setNewNotifications(prev => [{
                         id: Date.now(),
-                        message: `Auction for ${data.asset_name} ended. ${data.won ? 'You won!' : 'Outbid'}`,
+                        message: data.popup_message,
                         read_at: null,
                         created_at: new Date().toISOString()
                     }, ...prev]);
                     setUnreadCount(prev => prev + 1);
-                })
-                .listen('WatchlistUpdated', (data) => {
-                    if (data.isWatching) {
-                        setWatchlist(prev => [...prev, data.asset]);
-                    } else {
-                        setWatchlist(prev => prev.filter(item => item.id !== data.assetId));
-                    }
-                });
+                }
+            });
 
+            // Cleanup function
             return () => {
-                echo.leave(`private-user.${auth.user.id}`);
+                console.log('Cleaning up Pusher listeners');
+                privateChannel.stopListening('BidUpdated');
+                privateChannel.stopListening('AuctionEnded');
+                privateChannel.stopListening('WatchlistUpdated');
+                privateChannel.stopListening('AuctionCompleted');
+                window.Echo.leave(`private-user.${auth.user.id}`);
+                window.Echo.leave('auctions');
             };
         }
     }, [auth?.user?.id]);
@@ -767,8 +831,8 @@ const Dashboard = () => {
                                                         Ksh {bid.amount.toLocaleString()} · {format(new Date(bid.created_at), 'MMM d, h:mm a')}
                                                     </div>
                                                 </div>
-                                                <Badge bg={bid.is_winning ? "success" : "secondary"}>
-                                                    {bid.is_winning ? "Winning" : "Outbid"}
+                                                <Badge bg={bid.is_winning ? "success" : (bid.is_leading ? "info" : "secondary")}>
+                                                    {bid.is_winning ? "Winning" : (bid.is_leading ? "Leading" : "Outbid")}
                                                 </Badge>
                                             </div>
                                         </ListGroup.Item>

@@ -35,4 +35,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
+// Auction processing endpoint
+Route::post('/auctions/process-ended', [AuctionController::class, 'processEndedAuctions'])
+    ->middleware('auth:sanctum');
+
 

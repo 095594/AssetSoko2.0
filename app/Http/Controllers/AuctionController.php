@@ -9,9 +9,20 @@ use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\WinningBidNotification;
 use Illuminate\Support\Facades\Auth;
+use App\Services\AuctionService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
+use App\Notifications\WinningBidderNotification;
 
 class AuctionController extends Controller
 {
+    protected $auctionService;
+
+    public function __construct(AuctionService $auctionService)
+    {
+        $this->auctionService = $auctionService;
+    }
+
     // Fetch all active auctions
     public function index()
     {
@@ -100,19 +111,65 @@ class AuctionController extends Controller
         $winningBid = Bid::where('auction_id', $id)->orderBy('amount', 'desc')->first();
 
         if ($winningBid) {
-            $auction = Auction::find($auction_id);
             $auction->update([
                 'status' => 'ended',
                 'winner_id' => $winningBid->user_id
             ]);
 
-            // Notify winner via email
+            // Notify winner via notification system
             $winner = User::find($winningBid->user_id);
-            Mail::to($winner->email)->send(new WinningBidNotification($auction, $winningBid));
+            $winner->notify(new WinningBidderNotification($auction, $winningBid));
 
             return response()->json(['message' => 'Auction ended. Winner has been notified!']);
         }
 
         return response()->json(['message' => 'No bids were placed. Auction ended without a winner.']);
+    }
+
+    public function processEndedAuctions(Request $request)
+    {
+        // Verify the request is authorized
+        if (!$this->isAuthorized($request)) {
+            Log::warning('Unauthorized attempt to process ended auctions', [
+                'ip' => $request->ip(),
+                'headers' => $request->headers->all()
+            ]);
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        try {
+            Log::info('Starting processing of ended auctions');
+            
+            // Process ended auctions
+            $result = $this->auctionService->processEndedAuctions();
+            
+            Log::info('Successfully processed ended auctions', [
+                'processed_count' => $result['processed_count'] ?? 0,
+                'winners_notified' => $result['winners_notified'] ?? 0,
+                'sellers_notified' => $result['sellers_notified'] ?? 0
+            ]);
+
+            return response()->json([
+                'message' => 'Successfully processed ended auctions',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error processing ended auctions: ' . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'error' => 'Failed to process auctions',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    protected function isAuthorized(Request $request)
+    {
+        $apiKey = $request->header('X-API-Key');
+        $expectedKey = config('app.api_key');
+        
+        return $apiKey && hash_equals($expectedKey, $apiKey);
     }
 }

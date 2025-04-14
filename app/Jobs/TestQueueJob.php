@@ -15,7 +15,7 @@ class TestQueueJob implements ShouldQueue
 
     public function handle()
     {
-        Log::info('Test job is running!');
-        echo "Test job is running!\n";
+        Log::info('Test queue job executed successfully');
+        return true;
     }
 } 

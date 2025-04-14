@@ -8,30 +8,39 @@ import {
 } from "react-icons/fi";
 import { formatCurrency } from '@/utils/format';
 
-const NavItem = ({ icon: Icon, label, href, isActive, isCollapsed, badge }) => (
-    <Link
-        href={href}
-        className={`nav-item d-flex align-items-center p-3 rounded-3 mb-2 text-decoration-none transition-all ${
-            isActive 
-                ? 'bg-primary text-white shadow-sm' 
-                : 'text-dark hover-bg-light'
-        } ${isCollapsed ? 'justify-content-center' : ''}`}
-    >
-        <div className="position-relative">
-            <Icon className={isCollapsed ? '' : 'me-3'} size={20} />
-            {badge && (
-                <Badge 
-                    bg="danger" 
-                    className="position-absolute top-0 start-100 translate-middle rounded-pill"
-                    style={{ fontSize: '0.6rem' }}
-                >
-                    {badge}
-                </Badge>
-            )}
-        </div>
-        {!isCollapsed && <span>{label}</span>}
-    </Link>
-);
+const NavItem = ({ icon: Icon, label, href, isActive, isCollapsed, badge }) => {
+    const handleClick = (e) => {
+        if (!href) {
+            e.preventDefault();
+        }
+    };
+
+    return (
+        <Link
+            href={href || '#'}
+            onClick={handleClick}
+            className={`nav-item d-flex align-items-center p-3 rounded-3 mb-2 text-decoration-none transition-all ${
+                isActive 
+                    ? 'bg-primary text-white shadow-sm' 
+                    : 'text-dark hover-bg-light'
+            } ${isCollapsed ? 'justify-content-center' : ''}`}
+        >
+            <div className="position-relative">
+                <Icon className={isCollapsed ? '' : 'me-3'} size={20} />
+                {badge && (
+                    <Badge 
+                        bg="danger" 
+                        className="position-absolute top-0 start-100 translate-middle rounded-pill"
+                        style={{ fontSize: '0.6rem' }}
+                    >
+                        {badge}
+                    </Badge>
+                )}
+            </div>
+            {!isCollapsed && <span>{label}</span>}
+        </Link>
+    );
+};
 
 const BuyerLayout = ({ children }) => {
     const { auth, url: currentUrl } = usePage().props;
@@ -52,7 +61,8 @@ const BuyerLayout = ({ children }) => {
         return currentUrl?.startsWith(path) ?? false;
     };
 
-    const handleLogout = () => {
+    const handleLogout = (e) => {
+        e.preventDefault();
         router.post(route('logout'));
     };
 
@@ -188,7 +198,7 @@ const BuyerLayout = ({ children }) => {
                                     />
                                     <Button variant="outline-secondary">
                                         <FiSearch />
-                        </Button>
+                                    </Button>
                                 </div>
                             </div>
 
@@ -219,7 +229,7 @@ const BuyerLayout = ({ children }) => {
                             </Button>
                         </div>
 
-                        {/* User Menu - Moved to the end */}
+                        {/* User Menu */}
                         <div className="ms-auto">
                             <NavDropdown 
                                 title={
@@ -230,10 +240,10 @@ const BuyerLayout = ({ children }) => {
                                 } 
                                 id="user-dropdown"
                             >
-                                <NavDropdown.Item href={route('profile.edit')}>
+                                <NavDropdown.Item as={Link} href={route('profile.edit')}>
                                     Profile
                                 </NavDropdown.Item>
-                                <NavDropdown.Item href={route('settings')}>
+                                <NavDropdown.Item as={Link} href={route('settings')}>
                                     Settings
                                 </NavDropdown.Item>
                                 <NavDropdown.Divider />

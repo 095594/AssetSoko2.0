@@ -11,7 +11,9 @@ window.Echo = new Echo({
     broadcaster: 'pusher',
     key: import.meta.env.VITE_PUSHER_APP_KEY,
     cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
-    forceTLS: true,
+    wsHost: import.meta.env.VITE_PUSHER_HOST,
+    wsPort: import.meta.env.VITE_PUSHER_PORT,
+    forceTLS: import.meta.env.VITE_PUSHER_FORCETLS === 'true',
     encrypted: true,
     disableStats: true,
     enabledTransports: ['ws', 'wss'],
@@ -23,6 +25,22 @@ window.Echo = new Echo({
             'X-Requested-With': 'XMLHttpRequest'
         }
     }
+});
+
+// Configure Pusher debug logging
+Pusher.logToConsole = true;
+
+// Add connection monitoring
+window.Echo.connector.pusher.connection.bind('state_change', function(states) {
+    console.log('Pusher connection state changed:', states);
+});
+
+window.Echo.connector.pusher.connection.bind('connected', function() {
+    console.log('Successfully connected to Pusher');
+});
+
+window.Echo.connector.pusher.connection.bind('error', function(err) {
+    console.error('Pusher connection error:', err);
 });
 
 window.axios = axios;

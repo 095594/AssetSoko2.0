@@ -45,6 +45,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CategorySeeder::class);
         $this->call(PaymentMethodSeeder::class);
         $this->call(UserSeeder::class);
+        $this->call(AuctionNotificationTestSeeder::class);
 
         // Create some bids
         $assets = Asset::all();

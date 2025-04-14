@@ -28,6 +28,7 @@ import { EyeIcon, EyeSlashIcon, ClockIcon, TagIcon, CurrencyDollarIcon, UserGrou
 import { Dialog } from '@headlessui/react';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
+import Echo from 'laravel-echo';
 
 export default function Show({ auth, asset }) {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -38,6 +39,39 @@ export default function Show({ auth, asset }) {
     const [isWatching, setIsWatching] = useState(asset.is_watched || false);
     const [isToggling, setIsToggling] = useState(false);
     const [showBidSuccess, setShowBidSuccess] = useState(false);
+    const [auctionStatus, setAuctionStatus] = useState(asset.status);
+    const [winningBid, setWinningBid] = useState(null);
+
+    // Initialize Echo
+    useEffect(() => {
+        const echo = new Echo({
+            broadcaster: 'pusher',
+            key: import.meta.env.VITE_PUSHER_APP_KEY,
+            cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
+            forceTLS: true
+        });
+
+        // Listen for auction ended event
+        echo.channel(`auction.${asset.id}`)
+            .listen('AuctionEnded', (e) => {
+                console.log('Auction ended event received:', e);
+                setAuctionStatus(e.asset.status);
+                setWinningBid(e.winning_bid);
+                
+                if (e.winning_bid) {
+                    toast.success(`Auction ended! Winning bid: Ksh ${e.winning_bid.amount.toLocaleString()}`);
+                } else {
+                    toast.info('Auction ended with no winning bids');
+                }
+                
+                // Reload the page to update all data
+                window.location.reload();
+            });
+
+        return () => {
+            echo.leave(`auction.${asset.id}`);
+        };
+    }, [asset.id]);
 
     // Parse photos to ensure it's an array
     const photos = React.useMemo(() => {
@@ -62,7 +96,10 @@ export default function Show({ auth, asset }) {
 
     const timeLeft = new Date(asset.auction_end_time) - new Date();
     const hoursLeft = Math.max(Math.floor(timeLeft / (1000 * 60 * 60)), 0);
-    const canBid = auth.user && auth.user.id !== asset.user_id && timeLeft > 0;
+    const canBid = auth.user && 
+                  auth.user.id !== asset.user_id && 
+                  timeLeft > 0 && 
+                  auctionStatus === 'active';
     const isOwner = auth.user && auth.user.id === asset.user_id;
 
     // Calculate current price based on bids and reserve price

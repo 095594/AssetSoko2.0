@@ -12,38 +12,60 @@ const AuctionNotification = () => {
     useEffect(() => {
         console.log('Setting up Echo listener for auction notifications');
         
-        const channel = Echo.private(`App.Models.User.${window.authUser.id}`);
+        const channel = Echo.private(`private-user.${window.userId}`);
         
-        channel.listen('AuctionCompleted', (data) => {
-            console.log('Received auction completed event:', data);
+        channel.listen('.AuctionEndedBroadcast', (data) => {
+            console.log('Received auction ended event:', data);
             
-            if (data.show_popup) {
+            let title, message;
+            switch(data.type) {
+                case 'winner':
+                    title = 'Congratulations! You Won the Auction';
+                    message = `You won the auction for ${data.asset.name} with a bid of Ksh ${data.winningBid.amount}`;
+                    break;
+                case 'outbid':
+                    title = 'Auction Ended';
+                    message = `The auction for ${data.asset.name} has ended. Unfortunately, you were outbid.`;
+                    break;
+                case 'seller':
+                    title = 'Your Auction Has Ended';
+                    message = data.winningBid 
+                        ? `Your auction for ${data.asset.name} has ended. The winning bid was Ksh ${data.winningBid.amount}`
+                        : `Your auction for ${data.asset.name} has ended with no bids`;
+                    break;
+                default:
+                    return;
+            }
+            
+            if (data.type === 'winner') {
                 setShowPopup(true);
                 setPopupData({
-                    title: data.popup_title,
-                    message: data.popup_message,
-                    details: data.popup_details,
+                    title,
+                    message,
                     asset: data.asset,
-                    winningBid: data.winning_bid
+                    winningBid: data.winningBid.amount,
+                    details: {
+                        payment_due: 'Payment is due within 24 hours'
+                    }
                 });
             }
             
             showToast({
-                title: data.popup_title,
-                message: data.popup_message,
-                type: 'success'
+                title,
+                message,
+                type: data.type === 'outbid' ? 'info' : 'success'
             });
         });
 
         return () => {
             console.log('Cleaning up Echo listener');
-            channel.stopListening('AuctionCompleted');
+            channel.stopListening('.AuctionEndedBroadcast');
         };
     }, [showToast]);
 
     const handleProceedToPayment = () => {
         if (popupData?.asset) {
-            navigate(`/payments/initiate/${popupData.asset.id}`);
+            navigate(`/payments/create?asset=${popupData.asset.id}`);
         }
         setShowPopup(false);
     };
@@ -97,4 +119,4 @@ const AuctionNotification = () => {
     );
 };
 
-export default AuctionNotification; 
+export default AuctionNotification;

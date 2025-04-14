@@ -2,33 +2,29 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\TestQueueJob;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
+use App\Jobs\TestQueueJob;
 use Illuminate\Support\Facades\Log;
 
 class TestQueue extends Command
 {
-    protected $signature = 'test:queue';
-    protected $description = 'Test the queue system by dispatching a test job';
+    protected $signature = 'queue:test';
+    protected $description = 'Test the queue system';
 
     public function handle()
     {
+        $this->info('Dispatching test job...');
+        
         try {
-            $this->info('Checking database connection...');
-            DB::connection()->getPdo();
-            $this->info('Database connection is working!');
-
-            $this->info('Dispatching test job...');
             TestQueueJob::dispatch();
-            $this->info('Test job dispatched!');
-
-            $this->info('Checking jobs table...');
-            $jobs = DB::table('jobs')->get();
-            $this->info('Jobs in queue: ' . $jobs->count());
+            $this->info('Test job dispatched successfully');
+            $this->info('Check storage/logs/laravel.log for job execution');
         } catch (\Exception $e) {
-            $this->error('Error: ' . $e->getMessage());
-            Log::error('Queue test failed: ' . $e->getMessage());
+            $this->error('Error dispatching job: ' . $e->getMessage());
+            Log::error('Queue test failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 } 

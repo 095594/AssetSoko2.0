@@ -7,6 +7,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Notifications\AssetNotification;
 use Carbon\Carbon;
+use App\Notifications\WinningBidderNotification;
+use App\Notifications\AuctionEndedNotification;
+use App\Events\AuctionEnded;
+use Illuminate\Support\Facades\Log;
 
 class Asset extends Model
 {
@@ -36,8 +40,19 @@ class Asset extends Model
         'auction_end_time' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'photos' => 'array'
+        'photos' => 'array',
+        'is_featured' => 'boolean',
+        'is_active' => 'boolean',
     ];
+
+    protected static function booted()
+    {
+        static::saving(function ($asset) {
+            if ($asset->isDirty('status') && $asset->status === 'ended') {
+                $asset->processEndedAuction();
+            }
+        });
+    }
 
     public function user()
     {
@@ -121,5 +136,106 @@ class Asset extends Model
     public function seller()
     {
         return $this->user();
+    }
+
+    public function processEndedAuction()
+    {
+        Log::info('Starting to process ended auction', [
+            'asset_id' => $this->id,
+            'asset_name' => $this->name,
+            'current_time' => now()
+        ]);
+
+        try {
+            // Get the winning bid
+            $winningBid = $this->bids()
+                ->where('status', 'active')
+                ->orderBy('amount', 'desc')
+                ->first();
+
+            Log::info('Found winning bid', [
+                'asset_id' => $this->id,
+                'winning_bid_id' => $winningBid ? $winningBid->id : null,
+                'winning_bid_amount' => $winningBid ? $winningBid->amount : null
+            ]);
+
+            if ($winningBid) {
+                // Create payment record
+                $payment = Payment::create([
+                    'asset_id' => $this->id,
+                    'bid_id' => $winningBid->id,
+                    'buyer_id' => $winningBid->user_id,
+                    'seller_id' => $this->user_id,
+                    'amount' => $winningBid->amount,
+                    'status' => 'pending',
+                    'payment_method' => 'auction',
+                    'reference' => 'AUCTION-' . $this->id . '-' . time(),
+                ]);
+
+                Log::info('Created payment record', [
+                    'payment_id' => $payment->id,
+                    'amount' => $payment->amount,
+                    'user_id' => $payment->user_id
+                ]);
+
+                // Notify winning bidder
+                $winningBid->user->notify(new WinningBidderNotification($this, $winningBid));
+                Log::info('Sent notification to winning bidder', [
+                    'user_id' => $winningBid->user_id,
+                    'notification_type' => 'WinningBidderNotification'
+                ]);
+                
+                // Notify seller
+                $this->user->notify(new AuctionEndedNotification($this, $winningBid));
+                Log::info('Sent notification to seller', [
+                    'user_id' => $this->user_id,
+                    'notification_type' => 'AuctionEndedNotification'
+                ]);
+
+                // Broadcast event
+                broadcast(new AuctionEnded($this, $winningBid))->toOthers();
+                Log::info('Broadcasted AuctionEnded event', [
+                    'asset_id' => $this->id,
+                    'winning_bid_id' => $winningBid->id
+                ]);
+            } else {
+                // Notify seller that auction ended with no bids
+                $this->user->notify(new AuctionEndedNotification($this, null));
+                Log::info('Sent notification to seller (no winning bid)', [
+                    'user_id' => $this->user_id,
+                    'notification_type' => 'AuctionEndedNotification'
+                ]);
+                
+                // Broadcast event
+                broadcast(new AuctionEnded($this))->toOthers();
+                Log::info('Broadcasted AuctionEnded event (no winning bid)', [
+                    'asset_id' => $this->id
+                ]);
+            }
+
+            Log::info('Successfully processed ended auction', [
+                'asset_id' => $this->id,
+                'winning_bid_id' => $winningBid ? $winningBid->id : null,
+                'winning_bid_amount' => $winningBid ? $winningBid->amount : null,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error processing ended auction', [
+                'asset_id' => $this->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    public function setStatusAttribute($value)
+    {
+        if ($value === 'ended' && $this->status !== 'ended') {
+            $this->attributes['status'] = $value;
+            $this->processEndedAuction();
+        } else {
+            $this->attributes['status'] = $value;
+        }
     }
 }

@@ -6,6 +6,8 @@ use App\Models\Asset;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use App\Models\Auction;
 
 class AssetController extends Controller
 {
@@ -38,29 +40,52 @@ class AssetController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string',
-            'category' => 'required|string',
-            'base_price' => 'required|numeric|min:0',
-            'auction_end_time' => 'required|date|after:now',
-            'photos.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
+            'category_id' => 'required|exists:categories,id',
+            'condition' => 'required|in:new,used,refurbished',
+            'start_price' => 'required|numeric|min:0',
+            'reserve_price' => 'required|numeric|min:0|gte:start_price',
+            'end_time' => 'required|date|after:now',
+            'photos' => 'required|array|min:1',
+            'photos.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+            'location' => 'required|string',
+            'delivery_options' => 'required|array',
+            'delivery_options.*' => 'in:pickup,delivery',
+            'payment_methods' => 'required|array',
+            'payment_methods.*' => 'in:mpesa,bank_transfer,cash',
         ]);
 
-        $asset = new Asset($validated);
-        $asset->user_id = auth()->id();
+        try {
+            DB::beginTransaction();
 
-        if ($request->hasFile('photos')) {
-            $photos = [];
+            $asset = new Asset($validated);
+            $asset->user_id = auth()->id();
+            $asset->current_price = $validated['start_price'];
+            $asset->status = 'active';
+            $asset->save();
+
+            // Handle photos
             foreach ($request->file('photos') as $photo) {
-                $path = $photo->store('assets', 'public');
-                $photos[] = $path;
+                $path = $photo->store('assets/photos', 'public');
+                $asset->photos()->create(['path' => $path]);
             }
-            $asset->photos = json_encode($photos);
-            $asset->image_url = $photos[0];
+
+            // Create auction
+            $auction = new Auction([
+                'start_time' => now(),
+                'end_time' => $validated['end_time'],
+                'status' => 'active'
+            ]);
+            $asset->auction()->save($auction);
+
+            DB::commit();
+
+            return redirect()->route('assets.show', $asset)
+                ->with('success', 'Asset listed successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to create asset: ' . $e->getMessage());
         }
-
-        $asset->save();
-
-        return redirect()->route('assets.index')
-            ->with('success', 'Asset listed successfully.');
     }
 
     public function edit(Asset $asset)
@@ -76,42 +101,57 @@ class AssetController extends Controller
 
     public function update(Request $request, Asset $asset)
     {
-        if ($asset->user_id !== auth()->id()) {
-            abort(403, 'Unauthorized action.');
-        }
-
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'required|string',
-            'category' => 'required|string',
-            'base_price' => 'required|numeric|min:0',
-            'auction_end_time' => 'required|date|after:now',
-            'photos.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048'
+            'category_id' => 'required|exists:categories,id',
+            'condition' => 'required|in:new,used,refurbished',
+            'start_price' => 'required|numeric|min:0',
+            'reserve_price' => 'required|numeric|min:0|gte:start_price',
+            'end_time' => 'required|date|after:now',
+            'photos' => 'sometimes|array',
+            'photos.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+            'location' => 'required|string',
+            'delivery_options' => 'required|array',
+            'delivery_options.*' => 'in:pickup,delivery',
+            'payment_methods' => 'required|array',
+            'payment_methods.*' => 'in:mpesa,bank_transfer,cash',
         ]);
 
-        if ($request->hasFile('photos')) {
-            // Delete old photos
-            if ($asset->photos) {
-                $oldPhotos = json_decode($asset->photos, true);
-                foreach ($oldPhotos as $photo) {
-                    Storage::disk('public')->delete($photo);
+        try {
+            DB::beginTransaction();
+
+            // Update asset
+            $asset->update($validated);
+
+            // Handle new photos
+            if ($request->hasFile('photos')) {
+                foreach ($request->file('photos') as $photo) {
+                    $path = $photo->store('assets/photos', 'public');
+                    $asset->photos()->create(['path' => $path]);
                 }
             }
 
-            // Store new photos
-            $photos = [];
-            foreach ($request->file('photos') as $photo) {
-                $path = $photo->store('assets', 'public');
-                $photos[] = $path;
+            // Update auction
+            $asset->auction->update([
+                'end_time' => $validated['end_time']
+            ]);
+
+            // Check if auction should end
+            if (now() >= $asset->auction->end_time) {
+                $asset->status = 'ended';
+                $asset->save();
             }
-            $validated['photos'] = json_encode($photos);
-            $validated['image_url'] = $photos[0];
+
+            DB::commit();
+
+            return redirect()->route('assets.show', $asset)
+                ->with('success', 'Asset updated successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to update asset: ' . $e->getMessage());
         }
-
-        $asset->update($validated);
-
-        return redirect()->route('assets.index')
-            ->with('success', 'Asset updated successfully.');
     }
 
     public function destroy(Asset $asset)
@@ -146,7 +186,10 @@ class AssetController extends Controller
         }
 
         return Inertia::render('Assets/Show', [
-            'asset' => $asset
+            'asset' => $asset,
+            'auth' => [
+                'user' => auth()->user()
+            ]
         ]);
     }
 
@@ -225,7 +268,8 @@ class AssetController extends Controller
             $query->select('id', 'name', 'company_name');
         }])
             ->where('status', 'active')
-            ->where('auction_end_time', '>', now());
+            ->where('auction_end_time', '>', now())
+            ->withCount('bids');
 
         // Search by name
         if ($request->has('name') && !empty($request->name)) {
@@ -247,45 +291,32 @@ class AssetController extends Controller
         }
 
         // Apply sorting
-        switch ($request->input('sort', 'newest')) {
-            case 'oldest':
-                $query->oldest();
+        switch ($request->get('sort', 'newest')) {
+            case 'price_low':
+                $query->orderBy('current_price', 'asc');
                 break;
-            case 'price_asc':
-                $query->orderBy('current_price');
-                break;
-            case 'price_desc':
+            case 'price_high':
                 $query->orderBy('current_price', 'desc');
                 break;
             case 'ending_soon':
-                $query->orderBy('auction_end_time');
+                $query->orderBy('auction_end_time', 'asc');
                 break;
-            default: // newest
+            case 'most_bids':
+                $query->orderBy('bids_count', 'desc');
+                break;
+            default:
                 $query->latest();
-                break;
         }
 
-        // Add watchlist status if user is authenticated
-        if (auth()->check()) {
-            $query->with(['watchlist' => function ($query) {
-                $query->where('user_id', auth()->id());
-            }]);
-        }
-
-        $assets = $query->paginate(12)->withQueryString();
-
-        // Add is_watched property to each asset
-        if (auth()->check()) {
-            $assets->getCollection()->transform(function ($asset) {
-                $asset->is_watched = $asset->watchlist->isNotEmpty();
-                return $asset;
-            });
-        }
+        $assets = $query->paginate(12);
 
         return Inertia::render('Buyer/BrowseAssets', [
             'assets' => $assets,
-            'filters' => $request->only(['name', 'category', 'min_price', 'max_price', 'sort']),
-            'categories' => Asset::distinct()->pluck('category') // Add this to send available categories
+            'categories' => Asset::distinct()->pluck('category'),
+            'darkMode' => $this->getDarkModePreference(),
+            'auth' => [
+                'user' => auth()->user()
+            ]
         ]);
     }
 }

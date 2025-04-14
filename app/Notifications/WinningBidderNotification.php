@@ -32,26 +32,45 @@ class WinningBidderNotification extends Notification implements ShouldQueue
     {
         Log::info('Sending WinningBidderNotification via channels', [
             'user_id' => $notifiable->id,
-            'channels' => ['mail', 'database']
+            'channels' => ['mail', 'database', 'broadcast']
         ]);
-        return ['mail', 'database'];
+        return ['mail', 'database', 'broadcast'];
     }
 
     public function toMail($notifiable)
     {
-        Log::info('Preparing WinningBidderNotification email', [
-            'user_id' => $notifiable->id,
-            'asset_id' => $this->asset->id
-        ]);
-        
-        return (new MailMessage)
-            ->subject('Congratulations! You Won the Auction')
-            ->line("Congratulations! You have won the auction for {$this->asset->name}.")
-            ->line("Your winning bid: KES " . number_format($this->bid->amount, 2))
-            ->line("Please complete your payment to finalize the purchase.")
-            ->action('Complete Payment Now', route('buyer.payments.initiate', $this->asset->id))
-            ->line('Payment must be completed within 24 hours to secure your purchase.')
-            ->line('Thank you for using our platform!');
+        try {
+            Log::info('Preparing WinningBidderNotification email', [
+                'user_id' => $notifiable->id,
+                'asset_id' => $this->asset->id,
+                'bid_id' => $this->bid->id
+            ]);
+            
+            $mailMessage = (new MailMessage)
+                ->subject('Congratulations! You Won the Auction: ' . $this->asset->name)
+                ->markdown('emails.winning-bidder', [
+                    'asset' => $this->asset,
+                    'bid' => $this->bid,
+                    'user' => $notifiable
+                ])
+                ->line('Payment must be completed within 24 hours to secure your purchase.')
+                ->line('Thank you for using our platform!');
+
+            Log::info('Successfully prepared WinningBidderNotification email', [
+                'user_id' => $notifiable->id,
+                'asset_id' => $this->asset->id
+            ]);
+
+            return $mailMessage;
+        } catch (\Exception $e) {
+            Log::error('Error preparing WinningBidderNotification email', [
+                'user_id' => $notifiable->id,
+                'asset_id' => $this->asset->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
     }
 
     public function toArray($notifiable)
@@ -66,7 +85,7 @@ class WinningBidderNotification extends Notification implements ShouldQueue
             'asset_id' => $this->asset->id,
             'asset_name' => $this->asset->name,
             'bid_amount' => $this->bid->amount,
-            'message' => "Congratulations! You have won the auction for {$this->asset->name}. Your winning bid was KES " . number_format($this->bid->amount, 2) . ". Please complete your payment within 24 hours.",
+            'message' => "Congratulations! You won the auction for {$this->asset->name} with a bid of KES {$this->bid->amount}",
             'payment_url' => route('buyer.payments.initiate', $this->asset->id),
             'type' => 'auction_won'
         ];

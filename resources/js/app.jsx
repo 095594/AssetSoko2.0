@@ -10,6 +10,8 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import React from 'react';
+import { AuctionNotificationProvider } from './contexts/AuctionNotificationContext';
 
 // Add <ToastContainer /> to your root component
 
@@ -25,7 +27,17 @@ createInertiaApp({
     setup({ el, App, props }) {
         const root = createRoot(el);
 
-        root.render(<App {...props} />);
+        // Make user ID available globally for Pusher authentication
+        if (props.initialPage.props.auth?.user?.id) {
+            window.userId = props.initialPage.props.auth.user.id;
+        }
+
+        root.render(
+            <AuctionNotificationProvider>
+                <App {...props} />
+                <ToastContainer />
+            </AuctionNotificationProvider>
+        );
     },
     progress: {
         color: '#4B5563',

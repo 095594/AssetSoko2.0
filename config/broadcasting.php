@@ -33,10 +33,21 @@ return [
             'app_id' => env('PUSHER_APP_ID'),
             'options' => [
                 'cluster' => env('PUSHER_APP_CLUSTER'),
+                'host' => env('PUSHER_HOST', 'api-'.env('PUSHER_APP_CLUSTER', 'mt1').'.pusher.com'),
+                'port' => env('PUSHER_PORT', 443),
+                'scheme' => env('PUSHER_SCHEME', 'https'),
                 'encrypted' => true,
                 'useTLS' => true,
+                'timeout' => env('PUSHER_TIMEOUT', 30),
+                'curl_options' => [
+                    CURLOPT_SSL_VERIFYHOST => 0,
+                    CURLOPT_SSL_VERIFYPEER => 0,
+                    CURLOPT_TIMEOUT => env('PUSHER_TIMEOUT', 30),
+                ],
             ],
         ],
+    ],
+
 
         'redis' => [
             'driver' => 'redis',
@@ -50,6 +61,6 @@ return [
         'null' => [
             'driver' => 'null',
         ],
-    ],
+    
 ];
 

@@ -1,22 +1,30 @@
 import React, { useState } from "react";
-import { Head } from "@inertiajs/react";
+import { Head, router } from "@inertiajs/react";
 import AdminLayout from "@/Layouts/AdminLayout";
 import { Container, Card, Table, Button, Form, InputGroup, Badge, Row, Col, Pagination } from "react-bootstrap";
 import { FiSearch, FiEdit, FiTrash2, FiUserPlus, FiFilter } from "react-icons/fi";
 
-const UsersIndex = ({ users }) => {
-    const [searchTerm, setSearchTerm] = useState("");
-    const [roleFilter, setRoleFilter] = useState("all");
+const UsersIndex = ({ users, filters }) => {
+    const [searchTerm, setSearchTerm] = useState(filters.search || "");
+    const [roleFilter, setRoleFilter] = useState(filters.role || "all");
 
-    // Access the data property of the paginated collection
-    const usersData = users.data || [];
+    const handleSearch = (e) => {
+        setSearchTerm(e.target.value);
+        router.get(
+            route('admin.users.index'),
+            { search: e.target.value, role: roleFilter },
+            { preserveState: true, replace: true }
+        );
+    };
 
-    const filteredUsers = usersData.filter(user => {
-        const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesRole = roleFilter === "all" || user.role === roleFilter;
-        return matchesSearch && matchesRole;
-    });
+    const handleRoleFilter = (e) => {
+        setRoleFilter(e.target.value);
+        router.get(
+            route('admin.users.index'),
+            { search: searchTerm, role: e.target.value },
+            { preserveState: true, replace: true }
+        );
+    };
 
     const getRoleBadge = (role, isAdmin) => {
         if (isAdmin) {
@@ -38,13 +46,25 @@ const UsersIndex = ({ users }) => {
         return <Badge bg={variants[status] || "secondary"}>{status}</Badge>;
     };
 
+    const formatLastActive = (lastActive) => {
+        if (!lastActive) return 'Never';
+        const date = new Date(lastActive);
+        const now = new Date();
+        const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+        
+        if (diffInMinutes < 1) return 'Just now';
+        if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
+        if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
+        return date.toLocaleString();
+    };
+
     return (
         <AdminLayout>
             <Head title="Users Management" />
             <Container className="mt-4">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <h3>Users Management</h3>
-                                    <Button 
+                    <Button 
                         variant="primary"
                         href={route('admin.users.create')}
                     >
@@ -64,7 +84,7 @@ const UsersIndex = ({ users }) => {
                                     <Form.Control
                                         placeholder="Search users..."
                                         value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        onChange={handleSearch}
                                     />
                                 </InputGroup>
                             </Col>
@@ -75,7 +95,7 @@ const UsersIndex = ({ users }) => {
                                     </InputGroup.Text>
                                     <Form.Select
                                         value={roleFilter}
-                                        onChange={(e) => setRoleFilter(e.target.value)}
+                                        onChange={handleRoleFilter}
                                     >
                                         <option value="all">All Roles</option>
                                         <option value="admin">Admin</option>
@@ -101,8 +121,8 @@ const UsersIndex = ({ users }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredUsers.length > 0 ? (
-                                    filteredUsers.map((user) => (
+                                {users.data.length > 0 ? (
+                                    users.data.map((user) => (
                                         <tr key={user.id}>
                                             <td>
                                                 <div>
@@ -112,11 +132,7 @@ const UsersIndex = ({ users }) => {
                                             </td>
                                             <td>{getRoleBadge(user.role, user.is_admin)}</td>
                                             <td>{getStatusBadge(user.status)}</td>
-                                            <td>
-                                                {user.last_active
-                                                    ? new Date(user.last_active).toLocaleString()
-                                                    : 'Never'}
-                                            </td>
+                                            <td>{formatLastActive(user.last_active)}</td>
                                             <td>
                                                 <Button
                                                     variant="outline-primary"
@@ -136,7 +152,7 @@ const UsersIndex = ({ users }) => {
                                                     }}
                                                 >
                                                     <FiTrash2 />
-                                    </Button>
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))
@@ -148,14 +164,13 @@ const UsersIndex = ({ users }) => {
                                     </tr>
                                 )}
                             </tbody>
-                </Table>
+                        </Table>
 
-            {/* Pagination */}
+                        {/* Pagination */}
                         {users.links && users.links.length > 0 && (
                             <div className="d-flex justify-content-center mt-4">
                                 <Pagination>
                                     {users.links.map((link, index) => {
-                                        // Skip rendering if there's no URL
                                         if (!link.url) {
                                             return (
                                                 <Pagination.Item
@@ -163,24 +178,27 @@ const UsersIndex = ({ users }) => {
                                                     disabled
                                                     active={link.active}
                                                 >
-                                                    {link.label}
+                                                    {link.label === '&laquo; Previous' ? 'Previous' : 
+                                                     link.label === 'Next &raquo;' ? 'Next' : 
+                                                     link.label}
                                                 </Pagination.Item>
                                             );
                                         }
 
-                                        // For links with URLs, render as a link
                                         return (
                                             <Pagination.Item
                                                 key={index}
                                                 active={link.active}
                                                 href={link.url}
                                             >
-                                                {link.label}
+                                                {link.label === '&laquo; Previous' ? 'Previous' : 
+                                                 link.label === 'Next &raquo;' ? 'Next' : 
+                                                 link.label}
                                             </Pagination.Item>
                                         );
                                     })}
                                 </Pagination>
-                </div>
+                            </div>
                         )}
                     </Card.Body>
                 </Card>

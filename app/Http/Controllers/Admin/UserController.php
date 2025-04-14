@@ -15,11 +15,41 @@ class UserController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::paginate(10); // Paginate users
+        $query = User::select('id', 'name', 'email', 'role', 'status', 'is_admin', 'last_active', 'created_at');
+
+        // Apply search filter
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply role filter
+        if ($request->has('role') && $request->role !== 'all') {
+            $query->where('role', $request->role);
+        }
+
+        $users = $query->paginate(10)->through(function ($user) {
+            \Log::info('User ' . $user->id . ' last_active: ' . ($user->last_active ? $user->last_active->format('Y-m-d H:i:s') : 'null'));
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'status' => $user->status,
+                'is_admin' => $user->is_admin,
+                'last_active' => $user->last_active ? $user->last_active->format('Y-m-d H:i:s') : null,
+                'created_at' => $user->created_at->format('Y-m-d H:i:s')
+            ];
+        });
+
         return Inertia::render('Admin/Users/Index', [
-            'users' => $users
+            'users' => $users,
+            'filters' => $request->only(['search', 'role'])
         ]);
     }
 
@@ -40,14 +70,17 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6|confirmed',
-            'role' => 'required|in:admin,user'
+            'role' => 'required|in:admin,user,buyer,seller'
         ]);
+
+        // Convert any non-admin role to 'user'
+        $role = $request->role === 'admin' ? 'admin' : 'user';
 
         User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role,
+            'role' => $role,
         ]);
 
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
@@ -78,13 +111,16 @@ class UserController extends Controller
                 Rule::unique('users')->ignore($user->id),
             ],
             'password' => 'nullable|min:6|confirmed',
-            'role' => 'required|in:admin,user'
+            'role' => 'required|in:admin,user,buyer,seller'
         ]);
+
+        // Convert any non-admin role to 'user'
+        $role = $request->role === 'admin' ? 'admin' : 'user';
 
         $user->update([
             'name' => $request->name,
             'email' => $request->email,
-            'role' => $request->role,
+            'role' => $role,
             'password' => $request->password ? Hash::make($request->password) : $user->password,
         ]);
 
